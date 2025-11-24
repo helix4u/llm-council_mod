@@ -14,7 +14,7 @@ LLM Council is a 3-stage deliberation system where multiple LLMs collaboratively
 - Contains `COUNCIL_MODELS` (list of OpenRouter model identifiers)
 - Contains `CHAIRMAN_MODEL` (model that synthesizes final answer)
 - Uses environment variable `OPENROUTER_API_KEY` from `.env`
-- Backend runs on **port 8001** (NOT 8000 - user had another app on 8000)
+- Backend runs on **port 8002** (changed from 8001 to avoid conflict)
 
 **`openrouter.py`**
 - `query_model()`: Single async model query
@@ -115,7 +115,7 @@ This strict format allows reliable parsing while still getting thoughtful evalua
 All backend modules use relative imports (e.g., `from .config import ...`) not absolute imports. This is critical for Python's module system to work correctly when running as `python -m backend.main`.
 
 ### Port Configuration
-- Backend: 8001 (changed from 8000 to avoid conflict)
+- Backend: 8002 (changed from 8001 to avoid conflict)
 - Frontend: 5173 (Vite default)
 - Update both `backend/main.py` and `frontend/src/api.js` if changing
 

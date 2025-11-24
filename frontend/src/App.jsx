@@ -34,7 +34,7 @@ function App() {
 
   const loadConfig = async () => {
     try {
-      const response = await fetch('http://localhost:8001/api/config');
+      const response = await fetch('http://localhost:8002/api/config');
       const data = await response.json();
       setConfig(data);
       setCouncilModels(data.council_models || []);
