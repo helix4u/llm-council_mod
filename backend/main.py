@@ -402,30 +402,56 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
 
             # Stage 3: Synthesize final answer
             yield f"data: {json.dumps({'type': 'stage3_start'})}\n\n"
-            stage3_result = await stage3_synthesize_final(request.content, stage1_results, stage2_results, system_prompt=system_prompt, chairman_model=chairman_model, history_summary=conversation_compacted.get("summary", ""))
-            yield f"data: {json.dumps({'type': 'stage3_complete', 'data': stage3_result})}\n\n"
+            try:
+                stage3_result = await stage3_synthesize_final(request.content, stage1_results, stage2_results, system_prompt=system_prompt, chairman_model=chairman_model, history_summary=conversation_compacted.get("summary", ""))
+                yield f"data: {json.dumps({'type': 'stage3_complete', 'data': stage3_result})}\n\n"
+            except Exception as stage3_error:
+                print(f"Error in Stage 3: {stage3_error}")
+                import traceback
+                traceback.print_exc()
+                # Send error result but continue - Stage 1 data is still valid
+                stage3_result = {
+                    "model": chairman_model or "unknown",
+                    "response": f"Error: Unable to generate final synthesis. Stage 1 responses are still available above."
+                }
+                yield f"data: {json.dumps({'type': 'stage3_complete', 'data': stage3_result})}\n\n"
 
             # Wait for title generation if it was started
             if title_task:
-                title = await title_task
-                storage.update_conversation_title(conversation_id, title)
-                yield f"data: {json.dumps({'type': 'title_complete', 'data': {'title': title}})}\n\n"
+                try:
+                    title = await title_task
+                    storage.update_conversation_title(conversation_id, title)
+                    yield f"data: {json.dumps({'type': 'title_complete', 'data': {'title': title}})}\n\n"
+                except Exception as title_error:
+                    print(f"Error generating title: {title_error}")
+                    # Continue even if title generation fails
 
-            # Save complete assistant message
-            storage.add_assistant_message(
-                conversation_id,
-                stage1_results,
-                stage2_results,
-                stage3_result,
-                metadata={"label_to_model": label_to_model, "aggregate_rankings": aggregate_rankings}
-            )
+            # Save complete assistant message (even if some stages failed)
+            try:
+                storage.add_assistant_message(
+                    conversation_id,
+                    stage1_results,
+                    stage2_results,
+                    stage3_result,
+                    metadata={"label_to_model": label_to_model, "aggregate_rankings": aggregate_rankings}
+                )
+            except Exception as save_error:
+                print(f"Error saving assistant message: {save_error}")
+                # Continue even if save fails - Stage 1 data was already sent to frontend
 
             # Send completion event
             yield f"data: {json.dumps({'type': 'complete'})}\n\n"
 
         except Exception as e:
-            # Send error event
-            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+            # Log the error
+            print(f"Error in event generator: {e}")
+            import traceback
+            traceback.print_exc()
+            # Try to send error event, but if that fails too, just let the stream close
+            try:
+                yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+            except Exception:
+                pass  # Stream might already be closed
 
     return StreamingResponse(
         event_generator(),
