@@ -84,6 +84,12 @@ This file documents implementation decisions and features for maintaining consis
 - Persona_map matching: Backend tries exact model ID match first, then falls back to base model name matching.
 - Stage 2 robustness: Wrapped in try-except to handle malformed rankings gracefully.
 
+## Git/Repository
+- **CRITICAL**: NEVER push to `upstream` (karpathy/llm-council). This is the original repository we forked from.
+- Only push to `origin` (helix4u/llm-council_mod), which is our fork.
+- The `upstream` remote is configured with `no_push` to prevent accidental pushes. It should only be used for fetching updates.
+- Always verify you're pushing to `origin` before executing any push commands.
+
 ## Workflow
 - Log feature changes in `CHANGELOG.md`.
 - Track upcoming work in `TODO.md`.
