@@ -14,7 +14,7 @@ function deAnonymizeText(text, labelToModel) {
   return result;
 }
 
-export default function Stage2({ rankings, labelToModel, aggregateRankings }) {
+export default function Stage2({ rankings, labelToModel, aggregateRankings, onRedo, onCopy }) {
   const [activeTab, setActiveTab] = useState(0);
 
   if (!rankings || rankings.length === 0) {
@@ -24,6 +24,15 @@ export default function Stage2({ rankings, labelToModel, aggregateRankings }) {
   return (
     <div className="stage stage2">
       <h3 className="stage-title">Stage 2: Peer Rankings</h3>
+      <div className="stage-actions">
+        <button className="mini-btn" onClick={() => onRedo && onRedo()}>Redo</button>
+        <button
+          className="mini-btn"
+          onClick={() => onCopy && onCopy(rankings[activeTab]?.ranking || '')}
+        >
+          Copy
+        </button>
+      </div>
 
       <h4>Raw Evaluations</h4>
       <p className="stage-description">

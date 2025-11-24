@@ -48,6 +48,31 @@ export default function ChatInterface({
     );
   }
 
+  const handleRedo = (assistantIndex) => {
+    if (!conversation || !conversation.messages) return;
+    // Find the nearest user message before this assistant message
+    let userContent = null;
+    for (let i = assistantIndex - 1; i >= 0; i -= 1) {
+      const m = conversation.messages[i];
+      if (m.role === 'user' && m.content) {
+        userContent = m.content;
+        break;
+      }
+    }
+    if (userContent) {
+      onSendMessage(userContent, { redo: true });
+    }
+  };
+
+  const handleCopyText = async (text) => {
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch (e) {
+      console.error('Copy failed', e);
+    }
+  };
+
   return (
     <div className="chat-interface">
       <div className="messages-container">
@@ -79,7 +104,13 @@ export default function ChatInterface({
                       <span>Running Stage 1: Collecting individual responses...</span>
                     </div>
                   )}
-                  {msg.stage1 && <Stage1 responses={msg.stage1} />}
+                  {msg.stage1 && (
+                    <Stage1
+                      responses={msg.stage1}
+                      onRedo={() => handleRedo(index)}
+                      onCopy={(text) => handleCopyText(text)}
+                    />
+                  )}
 
                   {/* Stage 2 */}
                   {msg.loading?.stage2 && (
@@ -93,6 +124,8 @@ export default function ChatInterface({
                       rankings={msg.stage2}
                       labelToModel={msg.metadata?.label_to_model}
                       aggregateRankings={msg.metadata?.aggregate_rankings}
+                      onRedo={() => handleRedo(index)}
+                      onCopy={(text) => handleCopyText(text)}
                     />
                   )}
 
@@ -103,7 +136,13 @@ export default function ChatInterface({
                       <span>Running Stage 3: Final synthesis...</span>
                     </div>
                   )}
-                  {msg.stage3 && <Stage3 finalResponse={msg.stage3} />}
+                  {msg.stage3 && (
+                    <Stage3
+                      finalResponse={msg.stage3}
+                      onRedo={() => handleRedo(index)}
+                      onCopy={(text) => handleCopyText(text)}
+                    />
+                  )}
                 </div>
               )}
             </div>
@@ -120,26 +159,24 @@ export default function ChatInterface({
         <div ref={messagesEndRef} />
       </div>
 
-      {conversation.messages.length === 0 && (
-        <form className="input-form" onSubmit={handleSubmit}>
-          <textarea
-            className="message-input"
-            placeholder="Ask your question... (Shift+Enter for new line, Enter to send)"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            disabled={isLoading}
-            rows={3}
-          />
-          <button
-            type="submit"
-            className="send-button"
-            disabled={!input.trim() || isLoading}
-          >
-            Send
-          </button>
-        </form>
-      )}
+      <form className="input-form" onSubmit={handleSubmit}>
+        <textarea
+          className="message-input"
+          placeholder="Ask your question... (Shift+Enter for new line, Enter to send)"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={handleKeyDown}
+          disabled={isLoading}
+          rows={3}
+        />
+        <button
+          type="submit"
+          className="send-button"
+          disabled={!input.trim() || isLoading}
+        >
+          Send
+        </button>
+      </form>
     </div>
   );
 }

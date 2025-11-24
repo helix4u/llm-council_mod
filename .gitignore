@@ -1,21 +1,141 @@
-# Python-generated files
+# Python
 __pycache__/
-*.py[oc]
+*.py[cod]
+*$py.class
+*.so
+.Python
 build/
+develop-eggs/
 dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
 wheels/
-*.egg-info
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+*.manifest
+*.spec
 
 # Virtual environments
-.venv
+.venv/
+venv/
+ENV/
+env/
+.uv/
+.uvcache/
 
-# Keys and secrets
+# Environment variables and secrets
 .env
+.env.local
+.env.*.local
+*.key
+*.pem
 
 # Data files
 data/
+*.db
+*.sqlite
+*.sqlite3
 
-# Frontend
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*.sublime-project
+*.sublime-workspace
+.project
+.pydevproject
+.settings/
+*.sln
+*.suo
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# pytest
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.hypothesis/
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Frontend - Node.js
 frontend/node_modules/
 frontend/dist/
+frontend/dist-ssr/
 frontend/.vite/
+frontend/.vite-cache/
+frontend/.svelte-kit/
+frontend/build/
+frontend/.next/
+frontend/.nuxt/
+frontend/.output/
+frontend/.temp/
+
+# Frontend - Logs
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+frontend/pnpm-debug.log*
+frontend/lerna-debug.log*
+frontend/.pnpm-debug.log*
+
+# Frontend - Environment
+frontend/.env
+frontend/.env.local
+frontend/.env.*.local
+
+# OS files
+Thumbs.db
+.DS_Store
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.swp
+*.cache
+
+# Package manager lock files
+# Lock files should generally be committed for reproducible builds
+# Uncomment the ones you want to ignore if you prefer not to track them
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
+# uv.lock  # Keep this committed for uv dependency reproducibility
+
+# Coverage and testing
+.coverage
+coverage/
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# Local configuration files that shouldn't be committed
+*.local
+config.local.*

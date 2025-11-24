@@ -37,6 +37,9 @@ cd ..
 Create a `.env` file in the project root:
 
 ```bash
+# Copy env.example to .env and edit it
+cp env.example .env
+# Or create .env manually with:
 OPENROUTER_API_KEY=sk-or-v1-...
 ```
 
@@ -85,3 +88,39 @@ Then open http://localhost:5173 in your browser.
 - **Frontend:** React + Vite, react-markdown for rendering
 - **Storage:** JSON files in `data/conversations/`
 - **Package Management:** uv for Python, npm for JavaScript
+
+## Git Setup
+
+This project is ready for version control. To initialize git:
+
+```bash
+# Initialize git repository (if not already initialized)
+git init
+
+# Add all files
+git add .
+
+# Make your first commit
+git commit -m "Initial commit"
+
+# Add your remote repository
+git remote add origin https://github.com/helix4u/llm-council_mod.git
+
+# Push to repository
+git push -u origin main
+```
+
+**Note:** Make sure to:
+- Never commit your `.env` file (it's already in `.gitignore`)
+- Never commit the `data/` folder (conversations are stored here)
+- Review `.gitignore` to ensure sensitive files aren't tracked
+
+## Repository
+
+This is a modified version of the original [llm-council](https://github.com/karpathy/llm-council) project with additional features including:
+- Persona Compare mode for assigning different personas to individual models
+- Persistent model and persona selections
+- Enhanced UI for model management
+- Improved error handling and robustness
+
+Forked from [karpathy/llm-council](https://github.com/karpathy/llm-council) and maintained at [helix4u/llm-council_mod](https://github.com/helix4u/llm-council_mod).

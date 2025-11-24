@@ -1,17 +1,37 @@
 .stage3 {
-  background: #f0fff0;
-  border-color: #c8e6c8;
+  background: var(--panel);
+  border-color: var(--border);
+}
+
+.stage-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.mini-btn {
+  padding: 6px 10px;
+  background: var(--panel-alt);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.mini-btn:hover {
+  background: var(--panel);
 }
 
 .final-response {
-  background: #ffffff;
+  background: var(--panel-alt);
   padding: 20px;
   border-radius: 6px;
-  border: 1px solid #c8e6c8;
+  border: 1px solid var(--border);
 }
 
 .chairman-label {
-  color: #2d8a2d;
+  color: var(--muted);
   font-size: 12px;
   font-family: monospace;
   margin-bottom: 12px;
@@ -19,7 +39,7 @@
 }
 
 .final-text {
-  color: #333;
+  color: var(--text);
   line-height: 1.7;
   font-size: 15px;
 }

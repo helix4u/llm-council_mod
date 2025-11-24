@@ -1,0 +1,10 @@
+# Changelog
+
+## 2025-11-23
+- Added per-conversation history policy (max turns/tokens) with compaction summary; persisted only system/user/final messages.
+- Restored Stage 3 synthesis and passed compact history context through all stages.
+- Added OpenRouter model catalog endpoint with pricing and UI picker; conversation-level model overrides supported.
+- Enabled multi-turn chat input; separated analysis storage from conversational context.
+- Introduced `AGENTS.md` (Codex notes) and `TODO.md` for ongoing work tracking.
+- Added dark theme toggle, model search/refresh UI, and fallback model list when OpenRouter auth/rate limits block catalog fetch; improved settings apply UX/error surfacing.
+- Added per-stage redo + copy buttons, chairman model search box, and a Persona Compare (beta) mode with per-model persona assignments. Rate-limit handling now retries 429/503 with limited concurrency. UI styling unified to neutral grays in dark mode.
