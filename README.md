@@ -37,8 +37,8 @@ cd ..
 Create a `.env` file in the project root:
 
 ```bash
-# Copy env.example to .env and edit it
-cp env.example .env
+# Copy .env.example to .env and edit it
+cp .env.example .env
 # Or create .env manually with:
 OPENROUTER_API_KEY=sk-or-v1-...
 ```
@@ -47,8 +47,9 @@ Get your API key at [openrouter.ai](https://openrouter.ai/). Make sure to purcha
 
 ### 3. Configure Models (Optional)
 
-Edit `backend/config.py` to customize the council:
+You can customize models in two ways:
 
+**Option A: Edit `backend/config.py`** (default models):
 ```python
 COUNCIL_MODELS = [
     "openai/gpt-5.1",
@@ -59,6 +60,12 @@ COUNCIL_MODELS = [
 
 CHAIRMAN_MODEL = "google/gemini-3-pro-preview"
 ```
+
+**Option B: Use the UI** (recommended):
+- Models can be selected directly in the sidebar
+- Choose from all available OpenRouter models
+- Selections persist across sessions
+- Switch between Council Mode and Persona Compare Mode
 
 ## Running the Application
 
@@ -115,12 +122,59 @@ git push -u origin main
 - Never commit the `data/` folder (conversations are stored here)
 - Review `.gitignore` to ensure sensitive files aren't tracked
 
+## Features
+
+### Core Functionality
+- **Three-Stage Council Process**: Individual responses → Cross-model ranking → Final synthesis
+- **Multi-Turn Conversations**: Full conversation history with configurable retention policies
+- **OpenRouter Integration**: Access to 100+ LLM models with pricing information
+- **Anonymized Ranking**: Models rank responses without knowing which model produced them
+
+### Persona Management
+- **Save Personas**: Create and save reusable system prompts as named personas
+- **Apply to Conversation**: Apply a single persona as system prompt to entire conversation
+- **Persona Compare Mode**: Assign different personas to individual council models
+- **Per-Model Personas**: Each model can have its own unique persona/perspective
+
+### Model Management
+- **Model Catalog**: Browse and select from all available OpenRouter models
+- **Search/Filter**: Quickly find models by ID or name
+- **Persistent Selections**: Your model choices are saved in localStorage
+- **Pricing Display**: See prompt and completion pricing for each model
+
+### User Experience
+- **Two Modes**: Switch between Council Mode (traditional) and Persona Compare Mode
+- **Preview**: See which models and personas will run before applying
+- **Dark Mode**: Toggle between light and dark themes
+- **Error Handling**: Robust error handling prevents crashes on API failures
+- **Per-Stage Controls**: Redo or copy individual stage results
+
+## Persona Compare Mode
+
+Persona Compare Mode allows you to assign different personas (system prompts) to individual models in your council:
+
+1. **Switch to Persona Compare Mode** in the sidebar
+2. **Select Models**: Choose which models to enable from the full catalog
+3. **Assign Personas**: For each enabled model, select a persona from your saved personas
+4. **Preview**: Review which models will run with which personas
+5. **Apply**: Save the configuration to the current conversation
+6. **Send Messages**: The enabled models with their assigned personas will be used
+
+This is useful for:
+- Comparing different perspectives on the same question
+- Testing how different personalities affect responses
+- Creating specialized roles (e.g., one model as "skeptical critic", another as "optimistic supporter")
+
 ## Repository
 
-This is a modified version of the original [llm-council](https://github.com/karpathy/llm-council) project with additional features including:
-- Persona Compare mode for assigning different personas to individual models
-- Persistent model and persona selections
-- Enhanced UI for model management
-- Improved error handling and robustness
+This is a modified version of the original [llm-council](https://github.com/karpathy/llm-council) project with extensive enhancements:
+
+- ✅ **Persona Compare Mode**: Fully functional per-model persona assignment
+- ✅ **Persistent Settings**: Model selections, personas, and mode preferences saved locally
+- ✅ **Enhanced UI**: Improved model selection, search, preview, and organization
+- ✅ **Robust Error Handling**: Graceful degradation when models fail or rankings are malformed
+- ✅ **Stage 2 Fixes**: Uses actual models from Stage 1, not stale configured models
+- ✅ **Persona Management**: Full CRUD operations for personas
+- ✅ **Dark Mode**: Theme toggle with persistence
 
 Forked from [karpathy/llm-council](https://github.com/karpathy/llm-council) and maintained at [helix4u/llm-council_mod](https://github.com/helix4u/llm-council_mod).

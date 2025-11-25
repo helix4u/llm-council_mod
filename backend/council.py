@@ -226,7 +226,13 @@ Provide a clear, well-reasoned final answer that represents the council's collec
     messages.append({"role": "user", "content": chairman_prompt})
 
     selected_chairman = chairman_model or CHAIRMAN_MODEL
-    response = await query_model(selected_chairman, messages)
+    # Calculate timeout based on input size: base 120s + 10s per model response
+    # This accounts for larger prompts taking more time to process
+    num_responses = len(stage1_results) + len(stage2_results)
+    adaptive_timeout = 120.0 + (num_responses * 10.0)
+    # Cap at 300 seconds (5 minutes) to prevent excessive waits
+    adaptive_timeout = min(adaptive_timeout, 300.0)
+    response = await query_model(selected_chairman, messages, timeout=adaptive_timeout)
 
     if response is None:
         # Fallback if chairman fails

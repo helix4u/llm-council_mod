@@ -34,7 +34,7 @@ function App() {
 
   const loadConfig = async () => {
     try {
-      const response = await fetch('http://localhost:8001/api/config');
+      const response = await fetch('http://localhost:8002/api/config');
       const data = await response.json();
       setConfig(data);
       setCouncilModels(data.council_models || []);
@@ -248,19 +248,26 @@ function App() {
           case 'complete':
             // Stream complete, reload conversations list
             loadConversations();
+            // Reload current conversation to get saved message from server
+            if (currentConversationId) {
+              loadConversation(currentConversationId);
+            }
             setIsLoading(false);
             break;
 
           case 'error':
             console.error('Stream error:', event.message);
             // Update UI to show error in the last message
+            // IMPORTANT: Preserve any Stage 1/2/3 data that was already received
             setCurrentConversation((prev) => {
               if (!prev) return prev;
               const messages = [...prev.messages];
               const lastMsg = messages[messages.length - 1];
               if (lastMsg && lastMsg.role === 'assistant') {
+                // Preserve existing stage data - don't clear it
                 lastMsg.error = event.message || 'An error occurred';
                 lastMsg.loading = { stage1: false, stage2: false, stage3: false };
+                // If we have Stage 1 data but no error flag, keep it visible
               }
               return { ...prev, messages };
             });
@@ -279,11 +286,24 @@ function App() {
       });
     } catch (error) {
       console.error('Failed to send message:', error);
-      // Remove optimistic messages on error
-      setCurrentConversation((prev) => ({
-        ...prev,
-        messages: prev.messages.slice(0, -2),
-      }));
+      // Only remove optimistic messages if we haven't received any stage data yet
+      // If we have Stage 1 data, preserve it
+      setCurrentConversation((prev) => {
+        if (!prev) return prev;
+        const messages = [...prev.messages];
+        const lastMsg = messages[messages.length - 1];
+        // If we have Stage 1 data, keep the messages and just mark as error
+        if (lastMsg && lastMsg.role === 'assistant' && lastMsg.stage1) {
+          lastMsg.error = `Connection error: ${error.message}`;
+          lastMsg.loading = { stage1: false, stage2: false, stage3: false };
+          return { ...prev, messages };
+        }
+        // Otherwise, remove the optimistic messages
+        return {
+          ...prev,
+          messages: messages.slice(0, -2),
+        };
+      });
       setIsLoading(false);
     }
   };
