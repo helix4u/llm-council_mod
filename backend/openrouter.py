@@ -1,6 +1,5 @@
 """OpenRouter API client for making LLM requests."""
 
-import asyncio
 import httpx
 from typing import List, Dict, Any, Optional
 from httpx import HTTPStatusError
@@ -93,6 +92,8 @@ async def query_models_parallel(
     """
     Query multiple models with limited concurrency to respect rate limits.
     """
+    import asyncio
+
     semaphore = asyncio.Semaphore(concurrency)
     results: Dict[str, Optional[Dict[str, Any]]] = {}
 

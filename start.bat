@@ -21,7 +21,7 @@ if not exist ".env" (
 )
 
 REM Start backend in a new window
-echo Starting backend on http://localhost:8002...
+echo Starting backend on http://localhost:8001...
 start "LLM Council - Backend" cmd /k "uv run python -m backend.main"
 
 REM Wait a bit for backend to start
@@ -36,7 +36,7 @@ echo ========================================
 echo LLM Council is starting!
 echo ========================================
 echo.
-echo Backend:  http://localhost:8002
+echo Backend:  http://localhost:8001
 echo Frontend: http://localhost:5173
 echo.
 echo Two new windows have been opened for backend and frontend.

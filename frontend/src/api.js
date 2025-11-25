@@ -2,7 +2,7 @@
  * API client for the LLM Council backend.
  */
 
-const API_BASE = 'http://localhost:8002';
+const API_BASE = 'http://localhost:8001';
 
 export const api = {
   /**
@@ -84,22 +84,7 @@ export const api = {
   async sendMessageStream(conversationId, content, onEvent, options = {}) {
     const { historyPolicy = null, councilModels = null, chairmanModel = null, personaMap = null } = options;
     const controller = new AbortController();
-    
-    // Calculate adaptive timeout: base 120s + 30s per model
-    // This accounts for Stage 1 (models run in parallel but still take time),
-    // Stage 2 (rankings), and Stage 3 (synthesis of all responses)
-    const numModels = councilModels?.length || 3; // Default to 3 if not specified
-    const adaptiveTimeout = 120000 + (numModels * 30000); // 2 min base + 30s per model
-    // Cap at 10 minutes to prevent excessive waits
-    const maxTimeout = Math.min(adaptiveTimeout, 600000);
-    
-    let timeoutId = setTimeout(() => controller.abort(), maxTimeout);
-    
-    // Function to reset timeout on activity (ping messages or data)
-    const resetTimeout = () => {
-      clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => controller.abort(), maxTimeout);
-    };
+    const timeout = setTimeout(() => controller.abort(), 90000);
 
     const response = await fetch(
       `${API_BASE}/api/conversations/${conversationId}/message/stream`,
@@ -120,7 +105,7 @@ export const api = {
     );
 
     if (!response.ok) {
-      clearTimeout(timeoutId);
+      clearTimeout(timeout);
       throw new Error('Failed to send message');
     }
 
@@ -141,15 +126,6 @@ export const api = {
         const data = line.slice(6);
         try {
           const event = JSON.parse(data);
-          
-          // Reset timeout on any activity (including ping messages)
-          resetTimeout();
-          
-          // Handle ping messages (keepalive) - they reset timeout but don't trigger events
-          if (event.type === 'ping') {
-            continue; // Just reset timeout, don't pass to onEvent
-          }
-          
           onEvent(event.type, event);
         } catch (e) {
           console.error('Failed to parse SSE event:', e);
@@ -157,7 +133,7 @@ export const api = {
       }
     }
 
-    clearTimeout(timeoutId);
+    clearTimeout(timeout);
   },
 
   /**
