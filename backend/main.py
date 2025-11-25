@@ -401,9 +401,37 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
                 yield f"data: {json.dumps({'type': 'stage2_complete', 'data': stage2_results, 'metadata': {'label_to_model': label_to_model, 'aggregate_rankings': aggregate_rankings}})}\n\n"
 
             # Stage 3: Synthesize final answer
+            # Note: Stage 3 timeout is handled within stage3_synthesize_final (adaptive based on model count)
             yield f"data: {json.dumps({'type': 'stage3_start'})}\n\n"
             try:
-                stage3_result = await stage3_synthesize_final(request.content, stage1_results, stage2_results, system_prompt=system_prompt, chairman_model=chairman_model, history_summary=conversation_compacted.get("summary", ""))
+                # Start Stage 3 task
+                stage3_task = asyncio.create_task(
+                    stage3_synthesize_final(
+                        request.content, 
+                        stage1_results, 
+                        stage2_results, 
+                        system_prompt=system_prompt, 
+                        chairman_model=chairman_model, 
+                        history_summary=conversation_compacted.get("summary", "")
+                    )
+                )
+                
+                # Send keepalive pings every 30 seconds while Stage 3 is running
+                # This prevents timeout when Stage 3 takes a long time with many models
+                ping_interval = 30.0
+                last_ping = asyncio.get_event_loop().time()
+                
+                while not stage3_task.done():
+                    await asyncio.sleep(1.0)  # Check every second
+                    current_time = asyncio.get_event_loop().time()
+                    
+                    # Send ping if 30 seconds have passed since last ping
+                    if current_time - last_ping >= ping_interval:
+                        yield f"data: {json.dumps({'type': 'ping'})}\n\n"
+                        last_ping = current_time
+                
+                # Get the result
+                stage3_result = await stage3_task
                 yield f"data: {json.dumps({'type': 'stage3_complete', 'data': stage3_result})}\n\n"
             except Exception as stage3_error:
                 print(f"Error in Stage 3: {stage3_error}")
