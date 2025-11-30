@@ -19,9 +19,12 @@ export default function ChatInterface({
   const [localConversation, setLocalConversation] = useState(conversation);
   const messagesEndRef = useRef(null);
 
-  // Sync local conversation with prop
+  // Sync local conversation with prop, but preserve local state if prop is temporarily null
   useEffect(() => {
-    setLocalConversation(conversation);
+    if (conversation) {
+      setLocalConversation(conversation);
+    }
+    // Don't clear localConversation if conversation becomes null temporarily
   }, [conversation]);
 
   // Compute display conversation (use local if available, otherwise prop)
@@ -32,7 +35,9 @@ export default function ChatInterface({
   };
 
   useEffect(() => {
-    scrollToBottom();
+    if (displayConversation && displayConversation.messages) {
+      scrollToBottom();
+    }
   }, [displayConversation]);
 
   const handleSubmit = (e) => {
@@ -148,8 +153,11 @@ export default function ChatInterface({
       });
 
       // Reload conversation to get updated data from server
+      // Use setTimeout to avoid race condition with state updates
       if (onMessageDeleted) {
-        onMessageDeleted();
+        setTimeout(() => {
+          onMessageDeleted();
+        }, 100);
       }
     } catch (error) {
       console.error('Failed to retry stage:', error);
@@ -214,7 +222,7 @@ export default function ChatInterface({
         </div>
       </div>
       <div className="messages-container">
-        {displayConversation.messages.length === 0 ? (
+        {!displayConversation || !displayConversation.messages || displayConversation.messages.length === 0 ? (
           <div className="empty-state">
             <h2>Start a conversation</h2>
             <p>Ask a question to consult the LLM Council</p>
@@ -254,7 +262,7 @@ export default function ChatInterface({
                   </div>
 
                   {/* Council Rules/System Prompt Info - Show for latest message */}
-                  {index === displayConversation.messages.length - 1 && (displayConversation.system_prompt || (displayConversation.persona_map && Object.keys(displayConversation.persona_map).length > 0)) && (
+                  {displayConversation.messages && index === displayConversation.messages.length - 1 && (displayConversation.system_prompt || (displayConversation.persona_map && Object.keys(displayConversation.persona_map).length > 0)) && (
                     <div className="council-rules">
                       <details>
                         <summary className="council-rules-summary">

@@ -50,24 +50,28 @@ function App() {
   const loadConversation = async (id) => {
     try {
       const conv = await api.getConversation(id);
-      setCurrentConversation(conv);
-      if (conv?.models) {
-        if (conv.models.council && conv.models.council.length) {
-          setCouncilModels(conv.models.council);
-        } else if (config?.council_models) {
-          setCouncilModels(config.council_models);
+      // Only update if we got a valid conversation with messages array
+      if (conv && conv.id && Array.isArray(conv.messages)) {
+        setCurrentConversation(conv);
+        if (conv?.models) {
+          if (conv.models.council && conv.models.council.length) {
+            setCouncilModels(conv.models.council);
+          } else if (config?.council_models) {
+            setCouncilModels(config.council_models);
+          }
+          if (conv.models.chairman) {
+            setChairmanModel(conv.models.chairman);
+          } else if (config?.chairman_model) {
+            setChairmanModel(config.chairman_model);
+          }
         }
-        if (conv.models.chairman) {
-          setChairmanModel(conv.models.chairman);
-        } else if (config?.chairman_model) {
-          setChairmanModel(config.chairman_model);
+        if (conv?.history_policy) {
+          setHistoryPolicy(conv.history_policy);
         }
-      }
-      if (conv?.history_policy) {
-        setHistoryPolicy(conv.history_policy);
       }
     } catch (error) {
       console.error('Failed to load conversation:', error);
+      // Don't clear the conversation on error - keep what we have
     }
   };
 
@@ -257,9 +261,9 @@ function App() {
             // Stream complete, reload conversations list
             loadConversations();
             // Reload current conversation to get saved message from server
-            if (currentConversationId) {
-              loadConversation(currentConversationId);
-            }
+            // Use setTimeout to avoid race condition with state updates
+            // Don't reload immediately - the conversation state is already updated via streaming
+            // Only reload if we need to sync with server (e.g., after retry)
             setIsLoading(false);
             break;
 
