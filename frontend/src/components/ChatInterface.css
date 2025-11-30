@@ -6,6 +6,45 @@
   background: var(--bg);
 }
 
+.view-header {
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+  padding: 0 24px;
+}
+
+.view-tabs {
+  display: flex;
+  gap: 0;
+}
+
+.view-tab {
+  padding: 12px 24px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.view-tab:hover {
+  color: var(--text);
+  background: var(--panel-alt);
+}
+
+.view-tab.active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+
+.leaderboard-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0;
+}
+
 .messages-container {
   flex: 1;
   overflow-y: auto;

@@ -234,4 +234,19 @@ export const api = {
     }
     return response.json();
   },
+
+  /**
+   * Get leaderboard statistics.
+   */
+  async getLeaderboard(model = null, persona = null) {
+    const url = new URL(`${API_BASE}/api/leaderboard`);
+    if (model) url.searchParams.set('model', model);
+    if (persona) url.searchParams.set('persona', persona);
+    const response = await fetch(url.toString());
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(text || 'Failed to fetch leaderboard');
+    }
+    return response.json();
+  },
 };

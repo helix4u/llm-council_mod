@@ -144,10 +144,23 @@ git push -u origin main
 
 ### User Experience
 - **Two Modes**: Switch between Council Mode (traditional) and Persona Compare Mode
+- **View Tabs**: Switch between Chat and Leaderboard views in main content area
 - **Preview**: See which models and personas will run before applying
 - **Dark Mode**: Toggle between light and dark themes
 - **Error Handling**: Robust error handling prevents crashes on API failures
 - **Per-Stage Controls**: Redo or copy individual stage results
+
+### Leaderboard
+- **Cumulative Tracking**: Automatically tracks performance of each model+persona combination
+- **Performance Metrics**: 
+  - Average rank (lower is better)
+  - Total wins (rank #1 finishes)
+  - Win rate percentage
+  - Total participations
+  - Total votes received
+- **Filtering & Sorting**: Filter by model or persona, sort by rank/wins/participations
+- **Real-time Updates**: Updates automatically after each conversation completes
+- **Access**: Available via "Leaderboard" tab in the main content area
 
 ## Persona Compare Mode
 
@@ -176,5 +189,6 @@ This is a modified version of the original [llm-council](https://github.com/karp
 - ✅ **Stage 2 Fixes**: Uses actual models from Stage 1, not stale configured models
 - ✅ **Persona Management**: Full CRUD operations for personas
 - ✅ **Dark Mode**: Theme toggle with persistence
+- ✅ **Leaderboard**: Cumulative performance tracking for models and personas with filtering and sorting
 
 Forked from [karpathy/llm-council](https://github.com/karpathy/llm-council) and maintained at [helix4u/llm-council_mod](https://github.com/helix4u/llm-council_mod).

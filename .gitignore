@@ -45,6 +45,8 @@ data/
 *.db
 *.sqlite
 *.sqlite3
+# Leaderboard data (stored in data/conversations/leaderboard.json)
+**/leaderboard.json
 
 # IDE and editor files
 .vscode/

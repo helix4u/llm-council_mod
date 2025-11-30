@@ -1,6 +1,17 @@
 # Changelog
 
 ## 2025-01-XX
+- **Leaderboard Feature**: Cumulative performance tracking for models and personas
+  - Automatic tracking of model+persona combinations across all conversations
+  - Metrics: average rank, wins, win rate, participations, total votes
+  - Leaderboard view accessible via tab in main content area (right side)
+  - Filtering by model ID or persona name
+  - Sorting by average rank, wins, or participations
+  - Data stored in `data/conversations/leaderboard.json`
+  - Updates automatically when conversations complete with aggregate rankings
+  - API endpoint: `GET /api/leaderboard` with optional query parameters
+
+## 2025-01-XX (Previous)
 - **Persona Compare Mode**: Fully functional per-model persona assignment system
   - Select models from full catalog (not limited to council models)
   - Assign individual personas to each enabled model

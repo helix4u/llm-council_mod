@@ -3,6 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import Stage1 from './Stage1';
 import Stage2 from './Stage2';
 import Stage3 from './Stage3';
+import Leaderboard from './Leaderboard';
 import './ChatInterface.css';
 
 export default function ChatInterface({
@@ -11,6 +12,7 @@ export default function ChatInterface({
   isLoading,
 }) {
   const [input, setInput] = useState('');
+  const [viewMode, setViewMode] = useState('chat'); // 'chat' or 'leaderboard'
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -73,8 +75,51 @@ export default function ChatInterface({
     }
   };
 
+  // Show leaderboard view
+  if (viewMode === 'leaderboard') {
+    return (
+      <div className="chat-interface">
+        <div className="view-header">
+          <div className="view-tabs">
+            <button
+              className={`view-tab ${viewMode === 'chat' ? 'active' : ''}`}
+              onClick={() => setViewMode('chat')}
+            >
+              Chat
+            </button>
+            <button
+              className={`view-tab ${viewMode === 'leaderboard' ? 'active' : ''}`}
+              onClick={() => setViewMode('leaderboard')}
+            >
+              Leaderboard
+            </button>
+          </div>
+        </div>
+        <div className="leaderboard-container">
+          <Leaderboard />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="chat-interface">
+      <div className="view-header">
+        <div className="view-tabs">
+          <button
+            className={`view-tab ${viewMode === 'chat' ? 'active' : ''}`}
+            onClick={() => setViewMode('chat')}
+          >
+            Chat
+          </button>
+          <button
+            className={`view-tab ${viewMode === 'leaderboard' ? 'active' : ''}`}
+            onClick={() => setViewMode('leaderboard')}
+          >
+            Leaderboard
+          </button>
+        </div>
+      </div>
       <div className="messages-container">
         {conversation.messages.length === 0 ? (
           <div className="empty-state">

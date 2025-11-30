@@ -117,6 +117,23 @@ async def delete_persona(name: str):
     return {"status": "ok"}
 
 
+@app.get("/api/leaderboard")
+async def get_leaderboard(
+    model: str | None = None,
+    persona: str | None = None
+):
+    """Get cumulative leaderboard statistics for models and personas."""
+    from .leaderboard import get_leaderboard_stats
+    try:
+        stats = get_leaderboard_stats(
+            filter_model=model,
+            filter_persona=persona
+        )
+        return {"entries": stats}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to load leaderboard: {e}")
+
+
 @app.patch("/api/conversations/{conversation_id}/settings", response_model=Conversation)
 async def update_conversation_settings(conversation_id: str, request: UpdateConversationSettings):
     """Update conversation settings like history policy or models."""

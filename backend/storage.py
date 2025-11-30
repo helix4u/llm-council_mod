@@ -186,6 +186,20 @@ def add_assistant_message(
     conversation.setdefault("analyses", []).append(analysis_entry)
 
     save_conversation(conversation)
+    
+    # Update leaderboard with aggregate rankings if available
+    if metadata and metadata.get("aggregate_rankings"):
+        try:
+            from .leaderboard import update_leaderboard_from_aggregate_rankings
+            persona_map = conversation.get("persona_map") or {}
+            update_leaderboard_from_aggregate_rankings(
+                stage1,
+                metadata["aggregate_rankings"],
+                persona_map if persona_map else None
+            )
+        except Exception as e:
+            # Don't fail message saving if leaderboard update fails
+            print(f"Warning: Failed to update leaderboard: {e}")
 
 
 def update_conversation_title(conversation_id: str, title: str):

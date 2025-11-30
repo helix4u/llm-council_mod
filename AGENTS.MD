@@ -37,6 +37,15 @@ This file documents implementation decisions and features for maintaining consis
 - `llm-council-persona-compare-models`: Enabled models in Persona Compare Mode
 - `llm-council-theme`: UI theme preference ('light' or 'dark')
 
+## Leaderboard
+- **Storage**: Leaderboard data stored in `data/conversations/leaderboard.json`
+- **Tracking**: Automatically updated when assistant messages are saved with aggregate rankings
+- **Metrics**: Tracks per model+persona combination: participations, average rank, wins, win rate, total votes
+- **Persona matching**: Maps system prompts from persona_map to persona names via persona storage lookup
+- **Entry key**: Format is `{model_id}|{persona_name}` where persona_name is "None" if no persona assigned
+- **Update trigger**: Called from `add_assistant_message()` when metadata contains aggregate_rankings
+- **Filtering**: API supports filtering by model ID and/or persona name
+
 ## API Changes
 - `POST /api/conversations` accepts `history_policy`, `council_models`, `chairman_model`, `persona_map`.
 - `PATCH /api/conversations/{id}/settings` updates policy/models/system prompt/persona_map per conversation.
@@ -44,10 +53,12 @@ This file documents implementation decisions and features for maintaining consis
 - `GET /api/models` lists OpenRouter models for user selection with pricing metadata.
 - `GET /api/conversations/{id}` enriches assistant messages with stored analyses for UI, while keeping storage lean.
 - `GET /api/personas`, `POST /api/personas`, `DELETE /api/personas/{name}` for persona management.
+- `GET /api/leaderboard` returns cumulative leaderboard stats with optional `model` and `persona` query parameters.
 - Rate limiting: OpenRouter client retries 429/503 with exponential backoff and caps concurrency (2) for parallel calls.
 
 ## Frontend Notes
 - **Multi-turn chat**: Input always visible, full conversation history maintained.
+- **View modes**: Tabs at top of main content area allow switching between "Chat" and "Leaderboard" views.
 - **Two modes**: 
   - **Council Mode**: Traditional mode with shared system prompt, configurable council models
   - **Persona Compare Mode**: Select specific models and assign individual personas to each
@@ -56,6 +67,12 @@ This file documents implementation decisions and features for maintaining consis
 - **Search/filter**: Both mode selection lists support search/filter by model ID or name.
 - **Applying settings**: Writes to backend and updates in-memory defaults for new turns/conversations.
 - **Per-stage controls**: Stage1/2/3 include "Redo" (re-run last turn) and "Copy" buttons.
+- **Leaderboard UI**: 
+  - Accessible via "Leaderboard" tab in main content area (right side)
+  - Displays cumulative stats: rank, model, persona, average rank, wins, win rate, participations, votes
+  - Filtering by model ID or persona name
+  - Sorting by average rank, wins, or participations
+  - Auto-refreshes when filters change
 - **Persona Compare flow**:
   1. Switch to Persona Compare mode
   2. Select models to enable (checkboxes)
