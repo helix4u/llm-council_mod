@@ -74,6 +74,12 @@ class UpdateConversationSettings(BaseModel):
     persona_map: Dict[str, str] | None = None
 
 
+class RetryStageRequest(BaseModel):
+    """Request to retry a specific stage."""
+    stage: int
+    message_index: int
+
+
 class Persona(BaseModel):
     """Council Persona (saved system prompt)."""
     name: str
@@ -429,7 +435,8 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
                         stage2_results, 
                         system_prompt=system_prompt, 
                         chairman_model=chairman_model, 
-                        history_summary=conversation_compacted.get("summary", "")
+                        history_summary=conversation_compacted.get("summary", ""),
+                        persona_map=persona_map
                     )
                 )
                 
@@ -506,6 +513,207 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
             "Connection": "keep-alive",
         }
     )
+
+
+@app.delete("/api/conversations/{conversation_id}/messages/{message_index}")
+async def delete_message(conversation_id: str, message_index: int):
+    """Delete a message from a conversation by index."""
+    try:
+        conversation = storage.delete_message(conversation_id, message_index)
+        return {"success": True, "conversation": conversation}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/api/conversations/{conversation_id}")
+async def delete_conversation(conversation_id: str):
+    """Delete an entire conversation."""
+    try:
+        storage.delete_conversation(conversation_id)
+        return {"success": True}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/conversations/{conversation_id}/retry-stage")
+async def retry_stage(conversation_id: str, request: RetryStageRequest):
+    """
+    Retry a specific stage (1, 2, or 3) for the last assistant message.
+    
+    Request body:
+    - stage: int (1, 2, or 3)
+    - message_index: int (index of the assistant message to retry)
+    """
+    conversation = storage.get_conversation(conversation_id)
+    if conversation is None:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    
+    stage = request.get('stage')
+    message_index = request.get('message_index')
+    
+    if stage not in [1, 2, 3]:
+        raise HTTPException(status_code=400, detail="Stage must be 1, 2, or 3")
+    
+    messages = conversation.get("messages", [])
+    if message_index < 0 or message_index >= len(messages):
+        raise HTTPException(status_code=400, detail="Invalid message index")
+    
+    assistant_msg = messages[message_index]
+    if assistant_msg.get("role") != "assistant":
+        raise HTTPException(status_code=400, detail="Message at index is not an assistant message")
+    
+    # Get the user message that triggered this assistant response
+    user_content = None
+    for i in range(message_index - 1, -1, -1):
+        if messages[i].get("role") == "user":
+            user_content = messages[i].get("content")
+            break
+    
+    if not user_content:
+        raise HTTPException(status_code=400, detail="Could not find user message for this assistant response")
+    
+    # Get conversation settings
+    system_prompt = conversation.get("system_prompt") or DEFAULT_SYSTEM_PROMPT
+    models_cfg = conversation.get("models", {}) or {}
+    council_models = models_cfg.get("council")
+    chairman_model = models_cfg.get("chairman")
+    persona_map = conversation.get("persona_map") or {}
+    
+    if not council_models:
+        try:
+            from .config import COUNCIL_MODELS
+            council_models = COUNCIL_MODELS
+        except Exception:
+            council_models = []
+    if not chairman_model:
+        try:
+            from .config import CHAIRMAN_MODEL
+            chairman_model = CHAIRMAN_MODEL
+        except Exception:
+            chairman_model = None
+    
+    # Get existing analysis for this message
+    analyses = conversation.get("analyses", [])
+    assistant_idx = sum(1 for m in messages[:message_index] if m.get("role") == "assistant")
+    existing_analysis = analyses[assistant_idx] if assistant_idx < len(analyses) else {}
+    
+    # Build context for models
+    history_messages = []
+    if conversation.get("summary"):
+        history_messages.append({"role": "system", "content": f"Conversation summary so far: {conversation['summary']}"})
+    # Include messages up to (but not including) the user message that triggered this response
+    history_messages.extend(messages[:message_index - 1])
+    history_messages.append({"role": "user", "content": user_content})
+    
+    try:
+        if stage == 1:
+            # Retry Stage 1
+            stage1_results = await stage1_collect_responses(
+                history_messages,
+                system_prompt=system_prompt,
+                models=council_models,
+                persona_map=persona_map
+            )
+            # Update the analysis entry
+            if assistant_idx < len(analyses):
+                analyses[assistant_idx]["stage1"] = stage1_results
+                conversation["analyses"] = analyses
+                storage.save_conversation(conversation)
+            return {"stage": 1, "data": stage1_results}
+        
+        elif stage == 2:
+            # Need Stage 1 results
+            stage1_results = existing_analysis.get("stage1", [])
+            if not stage1_results:
+                raise HTTPException(status_code=400, detail="Stage 1 results not found. Run Stage 1 first.")
+            
+            # Get actual models that responded in Stage 1
+            actual_models = [r.get("model") for r in stage1_results if r.get("model")]
+            stage2_results, label_to_model = await stage2_collect_rankings(
+                user_content,
+                stage1_results,
+                system_prompt=system_prompt,
+                models=actual_models
+            )
+            # Calculate aggregate rankings
+            aggregate_rankings = []
+            try:
+                aggregate_rankings = calculate_aggregate_rankings(stage2_results, label_to_model)
+            except Exception as agg_error:
+                print(f"Error calculating aggregate rankings: {agg_error}")
+            
+            # Update the analysis entry
+            if assistant_idx < len(analyses):
+                analyses[assistant_idx]["stage2"] = stage2_results
+                if "metadata" not in analyses[assistant_idx]:
+                    analyses[assistant_idx]["metadata"] = {}
+                analyses[assistant_idx]["metadata"]["label_to_model"] = label_to_model
+                analyses[assistant_idx]["metadata"]["aggregate_rankings"] = aggregate_rankings
+                conversation["analyses"] = analyses
+                storage.save_conversation(conversation)
+            return {"stage": 2, "data": stage2_results, "metadata": {"label_to_model": label_to_model, "aggregate_rankings": aggregate_rankings}}
+        
+        elif stage == 3:
+            # Need Stage 1 and Stage 2 results
+            stage1_results = existing_analysis.get("stage1", [])
+            stage2_results = existing_analysis.get("stage2", [])
+            if not stage1_results:
+                raise HTTPException(status_code=400, detail="Stage 1 results not found. Run Stage 1 first.")
+            if not stage2_results:
+                raise HTTPException(status_code=400, detail="Stage 2 results not found. Run Stage 2 first.")
+            
+            stage3_result = await stage3_synthesize_final(
+                user_content,
+                stage1_results,
+                stage2_results,
+                system_prompt=system_prompt,
+                chairman_model=chairman_model,
+                history_summary=conversation.get("summary", ""),
+                persona_map=persona_map
+            )
+            # Update the analysis entry and assistant message
+            if assistant_idx < len(analyses):
+                analyses[assistant_idx]["stage3"] = stage3_result
+                conversation["analyses"] = analyses
+                # Also update the assistant message content
+                if message_index < len(messages):
+                    messages[message_index]["content"] = stage3_result.get("response", "")
+                    messages[message_index]["model"] = stage3_result.get("model")
+                    conversation["messages"] = messages
+                storage.save_conversation(conversation)
+            return {"stage": 3, "data": stage3_result}
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error retrying stage {stage}: {str(e)}")
+
+
+@app.get("/api/conversations/{conversation_id}/costs")
+async def get_conversation_costs(conversation_id: str):
+    """Calculate and return cost breakdown for a conversation."""
+    conversation = storage.get_conversation(conversation_id)
+    if conversation is None:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    
+    # Get model pricing from API
+    try:
+        models_data = await list_models()
+        model_pricing = {}
+        for model in models_data:
+            model_pricing[model['id']] = model.get('pricing', {})
+    except Exception:
+        # If we can't get pricing, return empty costs
+        model_pricing = {}
+    
+    # Calculate costs
+    from .cost_calculator import calculate_total_conversation_cost
+    analyses = conversation.get('analyses', [])
+    cost_data = calculate_total_conversation_cost(analyses, model_pricing)
+    
+    return cost_data
 
 
 if __name__ == "__main__":

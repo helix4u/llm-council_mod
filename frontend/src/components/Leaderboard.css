@@ -1,7 +1,7 @@
 .leaderboard {
   padding: 24px;
-  background: var(--bg-primary, #fff);
-  color: var(--text-primary, #000);
+  background: var(--bg);
+  color: var(--text);
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -21,8 +21,8 @@
 
 .refresh-btn {
   padding: 6px 12px;
-  background: var(--accent, #007bff);
-  color: white;
+  background: var(--primary);
+  color: var(--bg);
   border: none;
   border-radius: 4px;
   cursor: pointer;
@@ -30,7 +30,7 @@
 }
 
 .refresh-btn:hover:not(:disabled) {
-  background: var(--accent-hover, #0056b3);
+  background: var(--primary-hover);
 }
 
 .refresh-btn:disabled {
@@ -40,10 +40,11 @@
 
 .leaderboard-error {
   padding: 12px;
-  background: #fee;
-  color: #c33;
+  background: var(--panel-alt);
+  color: var(--primary);
   border-radius: 4px;
   margin-bottom: 16px;
+  border: 1px solid var(--primary);
 }
 
 .leaderboard-filters {
@@ -62,29 +63,29 @@
 
 .filter-group label {
   font-size: 0.85em;
-  color: var(--text-secondary, #666);
+  color: var(--muted);
 }
 
 .filter-group input,
 .filter-group select {
   padding: 6px 8px;
-  border: 1px solid var(--border, #ddd);
+  border: 1px solid var(--input-border);
   border-radius: 4px;
   font-size: 0.9em;
-  background: var(--bg-secondary, #f9f9f9);
-  color: var(--text-primary, #000);
+  background: var(--input-bg);
+  color: var(--text);
 }
 
 .leaderboard-loading,
 .leaderboard-empty {
   padding: 24px;
   text-align: center;
-  color: var(--text-secondary, #666);
+  color: var(--muted);
   font-style: italic;
 }
 
 .leaderboard-table {
-  border: 1px solid var(--border, #ddd);
+  border: 1px solid var(--border);
   border-radius: 4px;
   overflow: hidden;
   flex: 1;
@@ -130,11 +131,12 @@
 
 .col-persona {
   font-size: 0.9em;
-  color: var(--text-secondary, #666);
+  color: var(--muted);
 }
 
 .no-persona {
-  color: var(--text-tertiary, #999);
+  color: var(--muted);
+  opacity: 0.7;
   font-style: italic;
 }
 
@@ -143,26 +145,7 @@
   font-size: 0.9em;
 }
 
-/* Dark theme support */
-.theme-dark .leaderboard {
-  background: var(--bg-primary, #1a1a1a);
-  color: var(--text-primary, #e0e0e0);
-}
-
-.theme-dark .leaderboard-row.header {
-  background: var(--bg-secondary, #2a2a2a);
-}
-
-.theme-dark .leaderboard-row:not(.header):hover {
-  background: var(--bg-secondary, #2a2a2a);
-}
-
-.theme-dark .filter-group input,
-.theme-dark .filter-group select {
-  background: var(--bg-secondary, #2a2a2a);
-  border-color: var(--border, #444);
-  color: var(--text-primary, #e0e0e0);
-}
+/* Dark theme support - CSS variables handle this automatically */
 
 /* Responsive adjustments */
 @media (max-width: 1200px) {

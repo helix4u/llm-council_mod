@@ -4,16 +4,28 @@ import Stage1 from './Stage1';
 import Stage2 from './Stage2';
 import Stage3 from './Stage3';
 import Leaderboard from './Leaderboard';
+import { api } from '../api';
 import './ChatInterface.css';
 
 export default function ChatInterface({
   conversation,
   onSendMessage,
   isLoading,
+  onMessageDeleted,
+  onConversationUpdate,
 }) {
   const [input, setInput] = useState('');
   const [viewMode, setViewMode] = useState('chat'); // 'chat' or 'leaderboard'
+  const [localConversation, setLocalConversation] = useState(conversation);
   const messagesEndRef = useRef(null);
+
+  // Sync local conversation with prop
+  useEffect(() => {
+    setLocalConversation(conversation);
+  }, [conversation]);
+
+  // Compute display conversation (use local if available, otherwise prop)
+  const displayConversation = localConversation || conversation;
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -21,7 +33,7 @@ export default function ChatInterface({
 
   useEffect(() => {
     scrollToBottom();
-  }, [conversation]);
+  }, [displayConversation]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -39,7 +51,7 @@ export default function ChatInterface({
     }
   };
 
-  if (!conversation) {
+  if (!displayConversation) {
     return (
       <div className="chat-interface">
         <div className="empty-state">
@@ -72,6 +84,87 @@ export default function ChatInterface({
       await navigator.clipboard.writeText(text);
     } catch (e) {
       console.error('Copy failed', e);
+    }
+  };
+
+  const handleDeleteMessage = async (messageIndex) => {
+    if (!conversation?.id) return;
+    
+    if (!confirm('Are you sure you want to delete this message? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      await api.deleteMessage(conversation.id, messageIndex);
+      // Reload conversation after deletion
+      if (onMessageDeleted) {
+        onMessageDeleted();
+      }
+    } catch (error) {
+      console.error('Failed to delete message:', error);
+      alert('Failed to delete message: ' + (error.message || 'Unknown error'));
+    }
+  };
+
+  const handleRetryStage = async (messageIndex, stage) => {
+    if (!localConversation?.id) return;
+
+    try {
+      // Set loading state for the specific stage
+      setLocalConversation((prev) => {
+        if (!prev) return prev;
+        const messages = [...prev.messages];
+        const msg = messages[messageIndex];
+        if (msg && msg.role === 'assistant') {
+          if (!msg.loading) msg.loading = {};
+          msg.loading[`stage${stage}`] = true;
+        }
+        return { ...prev, messages };
+      });
+
+      const result = await api.retryStage(localConversation.id, messageIndex, stage);
+      
+      // Update the message with the new stage result
+      setLocalConversation((prev) => {
+        if (!prev) return prev;
+        const messages = [...prev.messages];
+        const msg = messages[messageIndex];
+        if (msg && msg.role === 'assistant') {
+          if (stage === 1) {
+            msg.stage1 = result.data;
+          } else if (stage === 2) {
+            msg.stage2 = result.data;
+            if (result.metadata) {
+              msg.metadata = { ...msg.metadata, ...result.metadata };
+            }
+          } else if (stage === 3) {
+            msg.stage3 = result.data;
+          }
+          if (msg.loading) {
+            msg.loading[`stage${stage}`] = false;
+          }
+        }
+        return { ...prev, messages };
+      });
+
+      // Reload conversation to get updated data from server
+      if (onMessageDeleted) {
+        onMessageDeleted();
+      }
+    } catch (error) {
+      console.error('Failed to retry stage:', error);
+      alert('Failed to retry stage: ' + (error.message || 'Unknown error'));
+      
+      // Clear loading state on error
+      setLocalConversation((prev) => {
+        if (!prev) return prev;
+        const messages = [...prev.messages];
+        const msg = messages[messageIndex];
+        if (msg && msg.role === 'assistant' && msg.loading) {
+          msg.loading[`stage${stage}`] = false;
+        }
+        return { ...prev, messages };
+      });
     }
   };
 
@@ -121,17 +214,26 @@ export default function ChatInterface({
         </div>
       </div>
       <div className="messages-container">
-        {conversation.messages.length === 0 ? (
+        {displayConversation.messages.length === 0 ? (
           <div className="empty-state">
             <h2>Start a conversation</h2>
             <p>Ask a question to consult the LLM Council</p>
           </div>
         ) : (
-          conversation.messages.map((msg, index) => (
+          displayConversation.messages.map((msg, index) => (
             <div key={index} className="message-group">
               {msg.role === 'user' ? (
                 <div className="user-message">
-                  <div className="message-label">You</div>
+                  <div className="message-header">
+                    <div className="message-label">You</div>
+                    <button
+                      className="message-delete-btn"
+                      onClick={() => handleDeleteMessage(index)}
+                      title="Delete this message"
+                    >
+                      🗑️
+                    </button>
+                  </div>
                   <div className="message-content">
                     <div className="markdown-content">
                       <ReactMarkdown>{msg.content}</ReactMarkdown>
@@ -140,7 +242,51 @@ export default function ChatInterface({
                 </div>
               ) : (
                 <div className="assistant-message">
-                  <div className="message-label">LLM Council</div>
+                  <div className="message-header">
+                    <div className="message-label">LLM Council</div>
+                    <button
+                      className="message-delete-btn"
+                      onClick={() => handleDeleteMessage(index)}
+                      title="Delete this message"
+                    >
+                      🗑️
+                    </button>
+                  </div>
+
+                  {/* Council Rules/System Prompt Info - Show for latest message */}
+                  {index === displayConversation.messages.length - 1 && (displayConversation.system_prompt || (displayConversation.persona_map && Object.keys(displayConversation.persona_map).length > 0)) && (
+                    <div className="council-rules">
+                      <details>
+                        <summary className="council-rules-summary">
+                          <span>📋 Council Rules & System Prompt</span>
+                        </summary>
+                        <div className="council-rules-content">
+                          {displayConversation.system_prompt && (
+                            <div className="system-prompt-display">
+                              <strong>System Prompt:</strong>
+                              <pre>{displayConversation.system_prompt}</pre>
+                            </div>
+                          )}
+                          {displayConversation.persona_map && Object.keys(displayConversation.persona_map).length > 0 && (
+                            <div className="persona-map-display">
+                              <strong>Per-Model Personas:</strong>
+                              <ul>
+                                {Object.entries(displayConversation.persona_map).map(([modelId, prompt]) => {
+                                  const personaName = prompt.substring(0, 50);
+                                  return (
+                                    <li key={modelId}>
+                                      <code>{modelId.split('/').pop() || modelId}</code>: {personaName}
+                                      {prompt.length > 50 ? '...' : ''}
+                                    </li>
+                                  );
+                                })}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                      </details>
+                    </div>
+                  )}
 
                   {/* Stage 1 */}
                   {msg.loading?.stage1 && (
@@ -152,7 +298,7 @@ export default function ChatInterface({
                   {msg.stage1 && (
                     <Stage1
                       responses={msg.stage1}
-                      onRedo={() => handleRedo(index)}
+                      onRedo={() => handleRetryStage(index, 1)}
                       onCopy={(text) => handleCopyText(text)}
                     />
                   )}
@@ -169,12 +315,12 @@ export default function ChatInterface({
                       rankings={msg.stage2}
                       labelToModel={msg.metadata?.label_to_model}
                       aggregateRankings={msg.metadata?.aggregate_rankings}
-                      onRedo={() => handleRedo(index)}
+                      onRedo={() => handleRetryStage(index, 2)}
                       onCopy={(text) => handleCopyText(text)}
                     />
                   )}
 
-                  {/* Stage 3 */}
+                  {/* Stage 3 - Final Synthesis (shown prominently) */}
                   {msg.loading?.stage3 && (
                     <div className="stage-loading">
                       <div className="spinner"></div>
@@ -184,7 +330,7 @@ export default function ChatInterface({
                   {msg.stage3 && (
                     <Stage3
                       finalResponse={msg.stage3}
-                      onRedo={() => handleRedo(index)}
+                      onRedo={() => handleRetryStage(index, 3)}
                       onCopy={(text) => handleCopyText(text)}
                     />
                   )}

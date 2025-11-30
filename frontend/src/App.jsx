@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import ChatInterface from './components/ChatInterface';
+import SettingsPanel from './components/SettingsPanel';
 import { api } from './api';
 import './App.css';
 
@@ -20,6 +21,7 @@ function App() {
   const [sidebarWidth, setSidebarWidth] = useState(280);
   const [isResizing, setIsResizing] = useState(false);
   const [personaCompareSettings, setPersonaCompareSettings] = useState(null);
+  const [showSettingsPanel, setShowSettingsPanel] = useState(false);
 
 
 
@@ -163,17 +165,23 @@ function App() {
       // If persona compare mode is active, use enabled models and their persona_map
       let modelsToUse = councilModels;
       let personaMapToUse = currentConversation?.persona_map || null;
+      let chairmanModelToUse = chairmanModel;
       
       if (personaCompareSettings && personaCompareSettings.enabledModels && personaCompareSettings.enabledModels.length > 0) {
         // Use the enabled models from persona compare mode
         modelsToUse = personaCompareSettings.enabledModels;
         // Use the persona_map from persona compare settings, not from conversation
         personaMapToUse = personaCompareSettings.personaMap || null;
-        console.log('Using persona compare settings:', { modelsToUse, personaMapToUse });
+        // Use chairman model from persona compare settings if set
+        if (personaCompareSettings.chairmanModel) {
+          chairmanModelToUse = personaCompareSettings.chairmanModel;
+        }
+        console.log('Using persona compare settings:', { modelsToUse, personaMapToUse, chairmanModelToUse });
       } else {
         // Fall back to conversation settings or default
         modelsToUse = councilModels;
         personaMapToUse = currentConversation?.persona_map || null;
+        chairmanModelToUse = chairmanModel;
       }
 
       // Send message with streaming
@@ -281,7 +289,7 @@ function App() {
       {
         historyPolicy,
         councilModels: modelsToUse,
-        chairmanModel,
+        chairmanModel: chairmanModelToUse,
         personaMap: personaMapToUse,
       });
     } catch (error) {
@@ -332,6 +340,17 @@ function App() {
         onPersonaCompareChange={(settings) => {
           setPersonaCompareSettings(settings);
         }}
+        onConversationDeleted={(deletedId) => {
+          // Remove from conversations list
+          setConversations(convs => convs.filter(c => c.id !== deletedId));
+          // If it was the current conversation, clear it
+          if (currentConversationId === deletedId) {
+            setCurrentConversationId(null);
+            setCurrentConversation(null);
+          }
+          // Reload conversations list
+          loadConversations();
+        }}
       />
       <div
         className="sidebar-resizer"
@@ -343,7 +362,47 @@ function App() {
         conversation={currentConversation}
         onSendMessage={handleSendMessage}
         isLoading={isLoading}
+        onMessageDeleted={() => {
+          if (currentConversationId) {
+            loadConversation(currentConversationId);
+          }
+        }}
       />
+      <button
+        className={`settings-toggle-btn ${showSettingsPanel ? 'settings-open' : ''}`}
+        onClick={() => setShowSettingsPanel(!showSettingsPanel)}
+        title={showSettingsPanel ? 'Hide Settings' : 'Show Settings'}
+      >
+        {showSettingsPanel ? '◀' : '▶'}
+      </button>
+      {showSettingsPanel && (
+        <>
+          <div
+            className="settings-resizer"
+            onMouseDown={() => setIsResizing(true)}
+            role="separator"
+            aria-orientation="vertical"
+          />
+          <SettingsPanel
+            currentConversationId={currentConversationId}
+            currentConversation={currentConversation}
+            onNewConversation={handleNewConversation}
+            onReloadConversation={loadConversation}
+            config={config}
+            councilModels={councilModels}
+            chairmanModel={chairmanModel}
+            historyPolicy={historyPolicy}
+            onSettingsChange={(settings) => {
+              if (settings.historyPolicy !== undefined) setHistoryPolicy(settings.historyPolicy);
+              if (settings.councilModels !== undefined) setCouncilModels(settings.councilModels);
+              if (settings.chairmanModel !== undefined) setChairmanModel(settings.chairmanModel);
+            }}
+            onPersonaCompareChange={(settings) => {
+              setPersonaCompareSettings(settings);
+            }}
+          />
+        </>
+      )}
     </div>
   );
 }

@@ -58,10 +58,14 @@ async def stage1_collect_responses(
     stage1_results = []
     for model, response in responses_raw.items():
         if response is not None:
-            stage1_results.append({
+            result = {
                 "model": model,
                 "response": response.get('content', '')
-            })
+            }
+            # Include usage data if available
+            if 'usage' in response:
+                result['usage'] = response['usage']
+            stage1_results.append(result)
 
     return stage1_results
 
@@ -150,11 +154,15 @@ Now provide your evaluation and ranking:"""
                 if not full_text:
                     continue  # Skip empty responses
                 parsed = parse_ranking_from_text(full_text)
-                stage2_results.append({
+                result = {
                     "model": model,
                     "ranking": full_text,
                     "parsed_ranking": parsed
-                })
+                }
+                # Include usage data if available
+                if 'usage' in response:
+                    result['usage'] = response['usage']
+                stage2_results.append(result)
             except Exception as e:
                 print(f"Error processing ranking from {model}: {e}")
                 # Continue with other models rather than failing completely
@@ -169,7 +177,8 @@ async def stage3_synthesize_final(
     stage2_results: List[Dict[str, Any]],
     system_prompt: Optional[str] = None,
     chairman_model: Optional[str] = None,
-    history_summary: str = ""
+    history_summary: str = "",
+    persona_map: Optional[Dict[str, str]] = None
 ) -> Dict[str, Any]:
     """
     Stage 3: Chairman synthesizes the final answer.
@@ -219,13 +228,30 @@ Provide a clear, well-reasoned final answer that represents the council's collec
 
     messages = []
 
-    # Add system prompt if provided
-    if system_prompt:
+    selected_chairman = chairman_model or CHAIRMAN_MODEL
+    
+    # Check for chairman persona in persona_map first, then fall back to system_prompt
+    chairman_persona_prompt = None
+    if persona_map:
+        # Try exact match first
+        if selected_chairman in persona_map:
+            chairman_persona_prompt = persona_map[selected_chairman]
+        else:
+            # Try matching by base model name
+            chairman_base = selected_chairman.split('/')[-1].split(':')[0]
+            for map_model, prompt in persona_map.items():
+                map_base = map_model.split('/')[-1].split(':')[0]
+                if map_base == chairman_base:
+                    chairman_persona_prompt = prompt
+                    break
+    
+    # Use chairman persona if available, otherwise use system_prompt
+    if chairman_persona_prompt:
+        messages.append({"role": "system", "content": chairman_persona_prompt})
+    elif system_prompt:
         messages.append({"role": "system", "content": system_prompt})
 
     messages.append({"role": "user", "content": chairman_prompt})
-
-    selected_chairman = chairman_model or CHAIRMAN_MODEL
     # Calculate timeout based on input size: base 120s + 10s per model response
     # This accounts for larger prompts taking more time to process
     num_responses = len(stage1_results) + len(stage2_results)
@@ -241,10 +267,14 @@ Provide a clear, well-reasoned final answer that represents the council's collec
             "response": "Error: Unable to generate final synthesis."
         }
 
-    return {
+    result = {
         "model": selected_chairman,
         "response": response.get('content', '')
     }
+    # Include usage data if available
+    if 'usage' in response:
+        result['usage'] = response['usage']
+    return result
 
 
 def parse_ranking_from_text(ranking_text: str) -> List[str]:
@@ -428,7 +458,8 @@ async def run_full_council(
         stage2_results,
         system_prompt=system_prompt,
         chairman_model=chairman_model,
-        history_summary=history_summary
+        history_summary=history_summary,
+        persona_map=persona_map
     )
 
     # Prepare metadata

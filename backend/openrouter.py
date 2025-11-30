@@ -64,10 +64,16 @@ async def query_model(
 
                 data = response.json()
                 message = data['choices'][0]['message']
+                usage = data.get('usage', {})
 
                 return {
                     'content': message.get('content'),
-                    'reasoning_details': message.get('reasoning_details')
+                    'reasoning_details': message.get('reasoning_details'),
+                    'usage': {
+                        'prompt_tokens': usage.get('prompt_tokens', 0),
+                        'completion_tokens': usage.get('completion_tokens', 0),
+                        'total_tokens': usage.get('total_tokens', 0)
+                    }
                 }
 
         except httpx.HTTPStatusError as e:

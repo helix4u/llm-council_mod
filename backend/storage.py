@@ -19,6 +19,20 @@ def get_conversation_path(conversation_id: str) -> str:
     return os.path.join(DATA_DIR, f"{conversation_id}.json")
 
 
+def delete_conversation(conversation_id: str):
+    """
+    Delete a conversation file.
+    
+    Args:
+        conversation_id: Conversation identifier
+    """
+    path = get_conversation_path(conversation_id)
+    if os.path.exists(path):
+        os.remove(path)
+    else:
+        raise ValueError(f"Conversation {conversation_id} not found")
+
+
 def create_conversation(conversation_id: str, system_prompt: Optional[str] = None) -> Dict[str, Any]:
     """
     Create a new conversation.
@@ -142,7 +156,8 @@ def add_user_message(conversation_id: str, content: str):
 
     conversation["messages"].append({
         "role": "user",
-        "content": content
+        "content": content,
+        "created_at": datetime.utcnow().isoformat()
     })
 
     save_conversation(conversation)
@@ -172,7 +187,8 @@ def add_assistant_message(
     conversation["messages"].append({
         "role": "assistant",
         "content": stage3.get("response", ""),
-        "model": stage3.get("model")
+        "model": stage3.get("model"),
+        "created_at": datetime.utcnow().isoformat()
     })
 
     # Store full analysis separately to avoid bloating context
@@ -344,6 +360,38 @@ def compact_and_save(conversation_id: str, policy: Optional[Dict[str, Any]] = No
     compacted = compact_conversation(conversation, policy=policy)
     save_conversation(compacted)
     return compacted
+
+
+def delete_message(conversation_id: str, message_index: int):
+    """
+    Delete a message from a conversation by index.
+    
+    Args:
+        conversation_id: Conversation identifier
+        message_index: Index of the message to delete (0-based)
+    """
+    conversation = get_conversation(conversation_id)
+    if conversation is None:
+        raise ValueError(f"Conversation {conversation_id} not found")
+    
+    messages = conversation.get("messages", [])
+    if message_index < 0 or message_index >= len(messages):
+        raise ValueError(f"Message index {message_index} out of range")
+    
+    # Delete the message
+    deleted = messages.pop(message_index)
+    
+    # If it was an assistant message, also remove the corresponding analysis
+    if deleted.get("role") == "assistant":
+        analyses = conversation.get("analyses", [])
+        # Find the corresponding analysis (assistant messages correspond to analyses)
+        assistant_count = sum(1 for m in messages[:message_index] if m.get("role") == "assistant")
+        if assistant_count < len(analyses):
+            analyses.pop(assistant_count)
+            conversation["analyses"] = analyses
+    
+    save_conversation(conversation)
+    return conversation
 
 
 def update_conversation_settings(

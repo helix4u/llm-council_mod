@@ -249,4 +249,76 @@ export const api = {
     }
     return response.json();
   },
+
+  /**
+   * Delete a message from a conversation.
+   */
+  async deleteMessage(conversationId, messageIndex) {
+    const response = await fetch(
+      `${API_BASE}/api/conversations/${conversationId}/messages/${messageIndex}`,
+      {
+        method: 'DELETE',
+      }
+    );
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(text || 'Failed to delete message');
+    }
+    return response.json();
+  },
+
+  /**
+   * Get cost breakdown for a conversation.
+   */
+  async getConversationCosts(conversationId) {
+    const response = await fetch(
+      `${API_BASE}/api/conversations/${conversationId}/costs`
+    );
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(text || 'Failed to get conversation costs');
+    }
+    return response.json();
+  },
+
+  /**
+   * Delete an entire conversation.
+   */
+  async deleteConversation(conversationId) {
+    const response = await fetch(
+      `${API_BASE}/api/conversations/${conversationId}`,
+      {
+        method: 'DELETE',
+      }
+    );
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(text || 'Failed to delete conversation');
+    }
+    return response.json();
+  },
+
+  /**
+   * Retry a specific stage (1, 2, or 3) for an assistant message.
+   */
+  async retryStage(conversationId, messageIndex, stage) {
+    const response = await fetch(
+      `${API_BASE}/api/conversations/${conversationId}/retry-stage`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          stage,
+          message_index: messageIndex,
+        }),
+      }
+    );
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(text || 'Failed to retry stage');
+    }
+    return response.json();
+  },
 };

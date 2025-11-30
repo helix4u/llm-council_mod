@@ -22,6 +22,9 @@
   --user-bg: #f3f3f4;
   --assistant-bg: #f0f1f2;
   --code-bg: #efefef;
+  --bg-secondary: rgba(0, 0, 0, 0.05);
+  --text-primary: #1f1f23;
+  --text-secondary: #6b6b73;
 }
 
 .theme-dark {
@@ -39,6 +42,9 @@
   --user-bg: #1d222c;
   --assistant-bg: #181c24;
   --code-bg: #151922;
+  --bg-secondary: rgba(255, 255, 255, 0.05);
+  --text-primary: #e7e9ed;
+  --text-secondary: #9ca3af;
 }
 
 * {

@@ -1,6 +1,15 @@
 .stage3 {
   background: var(--panel);
-  border-color: var(--border);
+  border-color: var(--primary);
+  border-width: 2px;
+  box-shadow: 0 2px 8px var(--border);
+  margin-bottom: 24px;
+}
+
+.stage3 .stage-title {
+  color: var(--primary);
+  font-size: 1.3em;
+  font-weight: 700;
 }
 
 .stage-actions {
@@ -25,9 +34,10 @@
 
 .final-response {
   background: var(--panel-alt);
-  padding: 20px;
-  border-radius: 6px;
-  border: 1px solid var(--border);
+  padding: 24px;
+  border-radius: 8px;
+  border: 2px solid var(--primary);
+  box-shadow: 0 4px 12px var(--border);
 }
 
 .chairman-label {
