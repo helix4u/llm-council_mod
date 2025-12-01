@@ -56,8 +56,24 @@ async def stage1_collect_responses(
     tasks = [asyncio.create_task(call_model(m)) for m in target_models]
     responses_raw = {m: r for m, r in zip(target_models, await asyncio.gather(*tasks))}
     stage1_results = []
+    failed_models = []
+    
     for model, response in responses_raw.items():
-        if response is not None:
+        if response is None:
+            failed_models.append({
+                "model": model,
+                "error": "No response received"
+            })
+        elif 'error' in response:
+            # Response contains error information
+            failed_models.append({
+                "model": model,
+                "error": response['error'].get('message', 'Unknown error'),
+                "error_type": response['error'].get('type', 'unknown'),
+                "status_code": response['error'].get('status_code')
+            })
+        else:
+            # Successful response
             result = {
                 "model": model,
                 "response": response.get('content', '')
@@ -66,6 +82,16 @@ async def stage1_collect_responses(
             if 'usage' in response:
                 result['usage'] = response['usage']
             stage1_results.append(result)
+
+    # Log summary of failures if any
+    if failed_models:
+        failed_count = len(failed_models)
+        total_count = len(target_models)
+        print(f"Stage 1: {failed_count}/{total_count} models failed")
+        for failed in failed_models:
+            error_type = failed.get('error_type', 'unknown')
+            status_code = failed.get('status_code', 'N/A')
+            print(f"  - {failed['model']}: {error_type} (HTTP {status_code})")
 
     return stage1_results
 
@@ -147,8 +173,23 @@ Now provide your evaluation and ranking:"""
 
     # Format results
     stage2_results = []
+    failed_models = []
+    
     for model, response in responses.items():
-        if response is not None:
+        if response is None:
+            failed_models.append({
+                "model": model,
+                "error": "No response received"
+            })
+        elif 'error' in response:
+            # Response contains error information
+            failed_models.append({
+                "model": model,
+                "error": response['error'].get('message', 'Unknown error'),
+                "error_type": response['error'].get('type', 'unknown'),
+                "status_code": response['error'].get('status_code')
+            })
+        else:
             try:
                 full_text = response.get('content', '')
                 if not full_text:
@@ -165,8 +206,22 @@ Now provide your evaluation and ranking:"""
                 stage2_results.append(result)
             except Exception as e:
                 print(f"Error processing ranking from {model}: {e}")
+                failed_models.append({
+                    "model": model,
+                    "error": f"Failed to parse ranking: {str(e)}"
+                })
                 # Continue with other models rather than failing completely
                 continue
+
+    # Log summary of failures if any
+    if failed_models:
+        failed_count = len(failed_models)
+        total_count = len(target_models)
+        print(f"Stage 2: {failed_count}/{total_count} models failed to provide rankings")
+        for failed in failed_models:
+            error_type = failed.get('error_type', 'unknown')
+            status_code = failed.get('status_code', 'N/A')
+            print(f"  - {failed['model']}: {error_type} (HTTP {status_code})")
 
     return stage2_results, label_to_model
 
