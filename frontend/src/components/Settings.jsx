@@ -52,6 +52,28 @@ export default function Settings({
   const [maxTurns, setMaxTurns] = useState(historyPolicy?.max_turns || 6);
   const [maxTokens, setMaxTokens] = useState(historyPolicy?.max_tokens || 4000);
   
+  // Model sets management
+  const [savedModelSets, setSavedModelSets] = useState(() => {
+    try {
+      const stored = localStorage.getItem('llm-council-model-sets');
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [modelSetName, setModelSetName] = useState('');
+  
+  // Persona Compare model sets management
+  const [savedPersonaCompareSets, setSavedPersonaCompareSets] = useState(() => {
+    try {
+      const stored = localStorage.getItem('llm-council-persona-compare-sets');
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [personaCompareSetName, setPersonaCompareSetName] = useState('');
+  
   // Persona Compare Mode settings
   const [personaCompareModels, setPersonaCompareModels] = useState(() => {
     try {
@@ -633,34 +655,52 @@ Provide a clear, well-reasoned final answer that represents the council's collec
             <label>Council Models</label>
             <div className="model-search-row">
               <input
-                placeholder="Search models (id/name)..."
+                placeholder="Search/filter models (id/name)..."
                 value={modelQuery}
                 onChange={(e) => setModelQuery(e.target.value)}
               />
-              <button onClick={() => loadModels(modelQuery)} disabled={modelsLoading}>
-                {modelsLoading ? 'Loading' : 'Search'}
-              </button>
               <button onClick={() => loadModels()} disabled={modelsLoading}>
-                Refresh
+                {modelsLoading ? 'Loading...' : 'Refresh'}
               </button>
             </div>
             {modelsError && <div className="settings-error">{modelsError}</div>}
             <div className="model-listing">
-              {availableModels.slice(0, 50).map((model) => (
-                <label key={model.id} className="model-row">
-                  <input
-                    type="checkbox"
-                    checked={selectedCouncil.includes(model.id)}
-                    onChange={() => toggleCouncilSelection(model.id)}
-                  />
-                  <span className="model-name">{model.id}</span>
-                  <span className="model-price">
-                    P: {formatPrice(model.pricing?.prompt)} | C: {formatPrice(model.pricing?.completion)} per MTok
-                  </span>
-                </label>
-              ))}
+              {availableModels
+                .filter((m) => {
+                  if (!m || !m.id || typeof m.id !== 'string' || m.id.trim() === '') {
+                    return false;
+                  }
+                  if (!modelQuery) return true;
+                  const searchTerm = modelQuery.toLowerCase();
+                  return m.id.toLowerCase().includes(searchTerm) || 
+                         (m.name && m.name.toLowerCase().includes(searchTerm));
+                })
+                .sort((a, b) => (a.id || '').localeCompare(b.id || ''))
+                .slice(0, 50)
+                .map((model) => (
+                  <label key={model.id} className="model-row">
+                    <input
+                      type="checkbox"
+                      checked={selectedCouncil.includes(model.id)}
+                      onChange={() => toggleCouncilSelection(model.id)}
+                    />
+                    <span className="model-name">{model.id}</span>
+                    <span className="model-price">
+                      P: {formatPrice(model.pricing?.prompt)} | C: {formatPrice(model.pricing?.completion)} per MTok
+                    </span>
+                  </label>
+                ))}
               {!modelsLoading && availableModels.length === 0 && (
-                <div className="settings-hint">No models found.</div>
+                <div className="settings-hint">No models found. Click Refresh to load models.</div>
+              )}
+              {!modelsLoading && availableModels.length > 0 && modelQuery && 
+               availableModels.filter((m) => {
+                 if (!m || !m.id) return false;
+                 const searchTerm = modelQuery.toLowerCase();
+                 return m.id.toLowerCase().includes(searchTerm) || 
+                        (m.name && m.name.toLowerCase().includes(searchTerm));
+               }).length === 0 && (
+                <div className="settings-hint">No models match your search.</div>
               )}
             </div>
           </div>
@@ -675,9 +715,26 @@ Provide a clear, well-reasoned final answer that represents the council's collec
                     <div className="council-preview-title">Council Models ({selectedCouncil.length})</div>
                     {selectedCouncil.map((modelId) => {
                       const model = availableModels.find((m) => m.id === modelId);
+                      const modelNotFound = !model;
                       return (
-                        <div key={modelId} className="council-preview-item">
-                          <div className="council-preview-model">{modelId}</div>
+                        <div key={modelId} className={`council-preview-item ${modelNotFound ? 'model-not-found' : ''}`}>
+                          <div className="council-preview-model-row">
+                            <div className="council-preview-model">
+                              {modelId}
+                              {modelNotFound && (
+                                <span className="model-not-found-badge" title="Model not found in current catalog">⚠️</span>
+                              )}
+                            </div>
+                            <button
+                              className="remove-model-btn"
+                              onClick={() => {
+                                setSelectedCouncil((prev) => prev.filter((id) => id !== modelId));
+                              }}
+                              title="Remove model"
+                            >
+                              ×
+                            </button>
+                          </div>
                           {model && (
                             <div className="council-preview-pricing">
                               P: {formatPrice(model.pricing?.prompt)} | C: {formatPrice(model.pricing?.completion)} per MTok
@@ -691,8 +748,24 @@ Provide a clear, well-reasoned final answer that represents the council's collec
                 {selectedChair && (
                   <div className="council-preview-section">
                     <div className="council-preview-title">Chairman Model</div>
-                    <div className="council-preview-item council-preview-chairman">
-                      <div className="council-preview-model">{selectedChair}</div>
+                    <div className={`council-preview-item council-preview-chairman ${!availableModels.find((m) => m.id === selectedChair) ? 'model-not-found' : ''}`}>
+                      <div className="council-preview-model-row">
+                        <div className="council-preview-model">
+                          {selectedChair}
+                          {!availableModels.find((m) => m.id === selectedChair) && (
+                            <span className="model-not-found-badge" title="Model not found in current catalog">⚠️</span>
+                          )}
+                        </div>
+                        <button
+                          className="remove-model-btn"
+                          onClick={() => {
+                            setSelectedChair('');
+                          }}
+                          title="Remove chairman model"
+                        >
+                          ×
+                        </button>
+                      </div>
                       {(() => {
                         const model = availableModels.find((m) => m.id === selectedChair);
                         return model && (
@@ -706,6 +779,81 @@ Provide a clear, well-reasoned final answer that represents the council's collec
                 )}
                 {selectedCouncil.length === 0 && !selectedChair && (
                   <div className="settings-hint">No models selected. Select council models and chairman above.</div>
+                )}
+              </div>
+              
+              {/* Model Sets Management */}
+              <div className="model-sets-section">
+                <label>Save/Load Model Sets</label>
+                <div className="model-sets-controls">
+                  <input
+                    type="text"
+                    placeholder="Enter name for this model set..."
+                    value={modelSetName}
+                    onChange={(e) => setModelSetName(e.target.value)}
+                    className="model-set-name-input"
+                  />
+                  <button
+                    className="save-model-set-btn"
+                    onClick={() => {
+                      if (!modelSetName.trim()) {
+                        alert('Please enter a name for the model set');
+                        return;
+                      }
+                      const newSet = {
+                        name: modelSetName.trim(),
+                        councilModels: [...selectedCouncil],
+                        chairmanModel: selectedChair,
+                        createdAt: new Date().toISOString(),
+                      };
+                      const updated = [...savedModelSets.filter((s) => s.name !== newSet.name), newSet];
+                      setSavedModelSets(updated);
+                      localStorage.setItem('llm-council-model-sets', JSON.stringify(updated));
+                      setModelSetName('');
+                      alert(`Model set "${newSet.name}" saved!`);
+                    }}
+                  >
+                    Save Current Set
+                  </button>
+                </div>
+                {savedModelSets.length > 0 && (
+                  <div className="saved-model-sets">
+                    <div className="saved-sets-label">Saved Sets:</div>
+                    {savedModelSets.map((set, idx) => (
+                      <div key={idx} className="saved-model-set-item">
+                        <div className="saved-set-info">
+                          <span className="saved-set-name">{set.name}</span>
+                          <span className="saved-set-details">
+                            {set.councilModels.length} council, {set.chairmanModel ? '1' : '0'} chairman
+                          </span>
+                        </div>
+                        <div className="saved-set-actions">
+                          <button
+                            className="load-model-set-btn"
+                            onClick={() => {
+                              setSelectedCouncil(set.councilModels || []);
+                              setSelectedChair(set.chairmanModel || '');
+                              alert(`Loaded model set "${set.name}"`);
+                            }}
+                          >
+                            Load
+                          </button>
+                          <button
+                            className="delete-model-set-btn"
+                            onClick={() => {
+                              if (confirm(`Delete model set "${set.name}"?`)) {
+                                const updated = savedModelSets.filter((s) => s.name !== set.name);
+                                setSavedModelSets(updated);
+                                localStorage.setItem('llm-council-model-sets', JSON.stringify(updated));
+                              }
+                            }}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
             </div>
@@ -858,41 +1006,144 @@ Provide a clear, well-reasoned final answer that represents the council's collec
               <label>Preview: Assigned Personas</label>
               <div className="persona-preview-content">
                 {(() => {
-                  const assignedModels = personaCompareModels
-                    .filter((modelId) => {
-                      const assignment = personaAssignments[modelId];
-                      return assignment && assignment.personaName;
-                    })
-                    .sort((a, b) => a.localeCompare(b));
+                  const allModels = personaCompareModels.sort((a, b) => a.localeCompare(b));
 
-                  if (assignedModels.length === 0) {
+                  if (allModels.length === 0) {
                     return (
                       <div className="settings-hint">
-                        No personas assigned yet. Assign personas above to see preview.
+                        No models selected. Select models above to assign personas.
                       </div>
                     );
                   }
 
-                  return assignedModels.map((modelId) => {
+                  return allModels.map((modelId) => {
                     const assignment = personaAssignments[modelId];
-                    const persona = personas.find((p) => p.name === assignment?.personaName);
+                    const persona = assignment?.personaName ? personas.find((p) => p.name === assignment.personaName) : null;
+                    const model = availableModels.find((m) => m.id === modelId);
+                    const modelNotFound = !model;
 
                     return (
-                      <div key={modelId} className="persona-preview-item">
-                        <div className="persona-preview-model">{modelId}</div>
-                        <div className="persona-preview-persona-name">
-                          <strong>Persona:</strong> {assignment.personaName}
+                      <div key={modelId} className={`persona-preview-item ${modelNotFound ? 'model-not-found' : ''}`}>
+                        <div className="persona-preview-header">
+                          <div className="persona-preview-model">
+                            {modelId}
+                            {modelNotFound && (
+                              <span className="model-not-found-badge" title="Model not found in current catalog">⚠️</span>
+                            )}
+                          </div>
+                          <button
+                            className="remove-model-btn"
+                            onClick={() => {
+                              setPersonaCompareModels((prev) => prev.filter((id) => id !== modelId));
+                              setPersonaAssignments((prev) => {
+                                const updated = { ...prev };
+                                delete updated[modelId];
+                                return updated;
+                              });
+                            }}
+                            title="Remove model"
+                          >
+                            ×
+                          </button>
                         </div>
-                        {persona && (
-                          <div className="persona-preview-prompt">
-                            {persona.system_prompt.substring(0, 100)}
-                            {persona.system_prompt.length > 100 ? '...' : ''}
+                        {assignment?.personaName ? (
+                          <>
+                            <div className="persona-preview-persona-name">
+                              <strong>Persona:</strong> {assignment.personaName}
+                            </div>
+                            {persona && (
+                              <div className="persona-preview-prompt">
+                                {persona.system_prompt.substring(0, 100)}
+                                {persona.system_prompt.length > 100 ? '...' : ''}
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <div className="persona-preview-persona-name" style={{ fontStyle: 'italic', color: 'var(--muted)' }}>
+                            No persona assigned
                           </div>
                         )}
                       </div>
                     );
                   });
                 })()}
+              </div>
+              
+              {/* Persona Compare Model Sets Management */}
+              <div className="model-sets-section">
+                <label>Save/Load Model & Persona Sets</label>
+                <div className="model-sets-controls">
+                  <input
+                    type="text"
+                    placeholder="Enter name for this configuration..."
+                    value={personaCompareSetName}
+                    onChange={(e) => setPersonaCompareSetName(e.target.value)}
+                    className="model-set-name-input"
+                  />
+                  <button
+                    className="save-model-set-btn"
+                    onClick={() => {
+                      if (!personaCompareSetName.trim()) {
+                        alert('Please enter a name for the configuration');
+                        return;
+                      }
+                      const newSet = {
+                        name: personaCompareSetName.trim(),
+                        models: [...personaCompareModels],
+                        personaAssignments: { ...personaAssignments },
+                        chairmanModel: personaCompareChairman,
+                        createdAt: new Date().toISOString(),
+                      };
+                      const updated = [...savedPersonaCompareSets.filter((s) => s.name !== newSet.name), newSet];
+                      setSavedPersonaCompareSets(updated);
+                      localStorage.setItem('llm-council-persona-compare-sets', JSON.stringify(updated));
+                      setPersonaCompareSetName('');
+                      alert(`Configuration "${newSet.name}" saved!`);
+                    }}
+                  >
+                    Save Current Configuration
+                  </button>
+                </div>
+                {savedPersonaCompareSets.length > 0 && (
+                  <div className="saved-model-sets">
+                    <div className="saved-sets-label">Saved Configurations:</div>
+                    {savedPersonaCompareSets.map((set, idx) => (
+                      <div key={idx} className="saved-model-set-item">
+                        <div className="saved-set-info">
+                          <span className="saved-set-name">{set.name}</span>
+                          <span className="saved-set-details">
+                            {set.models.length} models, {Object.keys(set.personaAssignments || {}).filter(k => set.personaAssignments[k]?.personaName).length} personas, {set.chairmanModel ? '1' : '0'} chairman
+                          </span>
+                        </div>
+                        <div className="saved-set-actions">
+                          <button
+                            className="load-model-set-btn"
+                            onClick={() => {
+                              setPersonaCompareModels(set.models || []);
+                              setPersonaAssignments(set.personaAssignments || {});
+                              setPersonaCompareChairman(set.chairmanModel || '');
+                              alert(`Loaded configuration "${set.name}"`);
+                            }}
+                          >
+                            Load
+                          </button>
+                          <button
+                            className="delete-model-set-btn"
+                            onClick={() => {
+                              if (confirm(`Delete configuration "${set.name}"?`)) {
+                                const updated = savedPersonaCompareSets.filter((s) => s.name !== set.name);
+                                setSavedPersonaCompareSets(updated);
+                                localStorage.setItem('llm-council-persona-compare-sets', JSON.stringify(updated));
+                              }
+                            }}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}

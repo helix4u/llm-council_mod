@@ -521,12 +521,23 @@
   margin-bottom: 0;
 }
 
+.persona-preview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
 .persona-preview-model {
   font-weight: 600;
   font-size: 14px;
   color: var(--text);
-  margin-bottom: 6px;
   font-family: monospace;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .persona-preview-persona-name {
@@ -594,13 +605,59 @@
   background: var(--panel-alt);
 }
 
+.council-preview-model-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
 .council-preview-model {
   font-weight: 500;
   font-size: 14px;
   color: var(--text);
-  margin-bottom: 4px;
   font-family: monospace;
   word-break: break-all;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.model-not-found {
+  border-color: #ff9800;
+  background: rgba(255, 152, 0, 0.1);
+}
+
+.model-not-found-badge {
+  font-size: 12px;
+  color: #ff9800;
+  cursor: help;
+}
+
+.remove-model-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.remove-model-btn:hover {
+  background: var(--error, #dc3545);
+  border-color: var(--error, #dc3545);
+  color: white;
 }
 
 .council-preview-pricing {
@@ -624,5 +681,129 @@
 
 .council-preview-content::-webkit-scrollbar-thumb:hover {
   background: var(--primary);
+}
+
+/* Model Sets Management */
+.model-sets-section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.model-sets-controls {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  margin-bottom: 12px;
+}
+
+.model-set-name-input {
+  flex: 1;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--input-bg);
+  color: var(--text);
+  font-size: 14px;
+}
+
+.save-model-set-btn {
+  padding: 8px 16px;
+  background: var(--primary);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background 0.2s;
+  white-space: nowrap;
+}
+
+.save-model-set-btn:hover {
+  background: var(--primary-hover, #0056b3);
+}
+
+.saved-model-sets {
+  margin-top: 12px;
+}
+
+.saved-sets-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+
+.saved-model-set-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  margin-bottom: 8px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.saved-model-set-item:hover {
+  border-color: var(--primary);
+  background: var(--panel-alt);
+}
+
+.saved-set-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.saved-set-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.saved-set-details {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.saved-set-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.load-model-set-btn,
+.delete-model-set-btn {
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s;
+}
+
+.load-model-set-btn {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+.load-model-set-btn:hover {
+  background: var(--primary-hover, #0056b3);
+  border-color: var(--primary-hover, #0056b3);
+}
+
+.delete-model-set-btn {
+  background: transparent;
+  color: var(--error, #dc3545);
+  border-color: var(--error, #dc3545);
+}
+
+.delete-model-set-btn:hover {
+  background: var(--error, #dc3545);
+  color: white;
 }
 
