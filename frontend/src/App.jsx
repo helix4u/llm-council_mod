@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import ChatInterface from './components/ChatInterface';
-import SettingsPanel from './components/SettingsPanel';
 import { api } from './api';
 import './App.css';
 
@@ -21,7 +20,6 @@ function App() {
   const [sidebarWidth, setSidebarWidth] = useState(280);
   const [isResizing, setIsResizing] = useState(false);
   const [personaCompareSettings, setPersonaCompareSettings] = useState(null);
-  const [showSettingsPanel, setShowSettingsPanel] = useState(false);
 
 
 
@@ -157,6 +155,11 @@ function App() {
           stage2: false,
           stage3: false,
         },
+        progress: {
+          stage1: { completed: 0, total: 0, models: [] },
+          stage2: { completed: 0, total: 0 },
+          stage3: { inProgress: false },
+        },
       };
 
       // Add the partial assistant message
@@ -199,6 +202,28 @@ function App() {
               const messages = [...prev.messages];
               const lastMsg = messages[messages.length - 1];
               lastMsg.loading.stage1 = true;
+              // Initialize progress - set total to number of models we're using
+              if (!lastMsg.progress) lastMsg.progress = { stage1: { completed: 0, total: modelsToUse?.length || 0, models: [] }, stage2: { completed: 0, total: 0 }, stage3: { inProgress: false } };
+              else {
+                lastMsg.progress.stage1.total = modelsToUse?.length || 0;
+                lastMsg.progress.stage1.completed = 0;
+                lastMsg.progress.stage1.models = [];
+              }
+              return { ...prev, messages };
+            });
+            break;
+
+          case 'stage1_progress':
+            // Track individual model completion
+            setCurrentConversation((prev) => {
+              const messages = [...prev.messages];
+              const lastMsg = messages[messages.length - 1];
+              if (lastMsg && lastMsg.progress) {
+                if (!lastMsg.progress.stage1.models.includes(event.data.model)) {
+                  lastMsg.progress.stage1.models.push(event.data.model);
+                  lastMsg.progress.stage1.completed = lastMsg.progress.stage1.models.length;
+                }
+              }
               return { ...prev, messages };
             });
             break;
@@ -209,6 +234,10 @@ function App() {
               const lastMsg = messages[messages.length - 1];
               lastMsg.stage1 = event.data;
               lastMsg.loading.stage1 = false;
+              if (lastMsg.progress) {
+                lastMsg.progress.stage1.completed = event.data.length;
+                lastMsg.progress.stage1.total = event.data.length;
+              }
               return { ...prev, messages };
             });
             break;
@@ -218,6 +247,12 @@ function App() {
               const messages = [...prev.messages];
               const lastMsg = messages[messages.length - 1];
               lastMsg.loading.stage2 = true;
+              if (lastMsg.progress) {
+                // Stage 2 uses models from Stage 1
+                const stage1Count = lastMsg.stage1?.length || 0;
+                lastMsg.progress.stage2.total = stage1Count;
+                lastMsg.progress.stage2.completed = 0;
+              }
               return { ...prev, messages };
             });
             break;
@@ -229,6 +264,10 @@ function App() {
               lastMsg.stage2 = event.data;
               lastMsg.metadata = event.metadata;
               lastMsg.loading.stage2 = false;
+              if (lastMsg.progress) {
+                lastMsg.progress.stage2.completed = event.data.length;
+                lastMsg.progress.stage2.total = event.data.length;
+              }
               return { ...prev, messages };
             });
             break;
@@ -238,6 +277,9 @@ function App() {
               const messages = [...prev.messages];
               const lastMsg = messages[messages.length - 1];
               lastMsg.loading.stage3 = true;
+              if (lastMsg.progress) {
+                lastMsg.progress.stage3.inProgress = true;
+              }
               return { ...prev, messages };
             });
             break;
@@ -248,6 +290,21 @@ function App() {
               const lastMsg = messages[messages.length - 1];
               lastMsg.stage3 = event.data;
               lastMsg.loading.stage3 = false;
+              if (lastMsg.progress) {
+                lastMsg.progress.stage3.inProgress = false;
+              }
+              return { ...prev, messages };
+            });
+            break;
+
+          case 'costs':
+            setCurrentConversation((prev) => {
+              const messages = [...prev.messages];
+              const lastMsg = messages[messages.length - 1];
+              if (lastMsg && lastMsg.role === 'assistant') {
+                if (!lastMsg.metadata) lastMsg.metadata = {};
+                lastMsg.metadata.costs = event.data;
+              }
               return { ...prev, messages };
             });
             break;
@@ -371,42 +428,25 @@ function App() {
             loadConversation(currentConversationId);
           }
         }}
+        config={config}
+        councilModels={councilModels}
+        chairmanModel={chairmanModel}
+        historyPolicy={historyPolicy}
+        onSettingsChange={(settings) => {
+          if (settings.historyPolicy !== undefined) setHistoryPolicy(settings.historyPolicy);
+          if (settings.councilModels !== undefined) setCouncilModels(settings.councilModels);
+          if (settings.chairmanModel !== undefined) setChairmanModel(settings.chairmanModel);
+        }}
+        onPersonaCompareChange={(settings) => {
+          setPersonaCompareSettings(settings);
+        }}
+        onModeChange={(mode) => {
+          // Handle mode change - could update conversation settings
+          console.log('Mode changed to:', mode);
+        }}
+        onNewConversation={handleNewConversation}
+        onReloadConversation={loadConversation}
       />
-      <button
-        className={`settings-toggle-btn ${showSettingsPanel ? 'settings-open' : ''}`}
-        onClick={() => setShowSettingsPanel(!showSettingsPanel)}
-        title={showSettingsPanel ? 'Hide Settings' : 'Show Settings'}
-      >
-        {showSettingsPanel ? '◀' : '▶'}
-      </button>
-      {showSettingsPanel && (
-        <>
-          <div
-            className="settings-resizer"
-            onMouseDown={() => setIsResizing(true)}
-            role="separator"
-            aria-orientation="vertical"
-          />
-          <SettingsPanel
-            currentConversationId={currentConversationId}
-            currentConversation={currentConversation}
-            onNewConversation={handleNewConversation}
-            onReloadConversation={loadConversation}
-            config={config}
-            councilModels={councilModels}
-            chairmanModel={chairmanModel}
-            historyPolicy={historyPolicy}
-            onSettingsChange={(settings) => {
-              if (settings.historyPolicy !== undefined) setHistoryPolicy(settings.historyPolicy);
-              if (settings.councilModels !== undefined) setCouncilModels(settings.councilModels);
-              if (settings.chairmanModel !== undefined) setChairmanModel(settings.chairmanModel);
-            }}
-            onPersonaCompareChange={(settings) => {
-              setPersonaCompareSettings(settings);
-            }}
-          />
-        </>
-      )}
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
+import { formatCost, formatTokens } from '../utils/costUtils';
 import './Stage2.css';
 
 function deAnonymizeText(text, labelToModel) {
@@ -14,7 +15,7 @@ function deAnonymizeText(text, labelToModel) {
   return result;
 }
 
-export default function Stage2({ rankings, labelToModel, aggregateRankings, onRedo, onCopy }) {
+export default function Stage2({ rankings, labelToModel, aggregateRankings, onRedo, onCopy, costs }) {
   const [activeTab, setActiveTab] = useState(0);
 
   if (!rankings || rankings.length === 0) {
@@ -34,6 +35,16 @@ export default function Stage2({ rankings, labelToModel, aggregateRankings, onRe
         </button>
       </div>
 
+      {costs && (
+        <div className="stage-cost-summary">
+          <span className="cost-label">Stage 2 Total:</span>
+          <span className="cost-value">{formatCost(costs.total_cost)}</span>
+          <span className="cost-tokens">
+            ({formatTokens(costs.total_tokens?.total)} tokens)
+          </span>
+        </div>
+      )}
+
       <h4>Raw Evaluations</h4>
       <p className="stage-description">
         Each model evaluated all responses (anonymized as Response A, B, C, etc.) and provided rankings.
@@ -41,15 +52,21 @@ export default function Stage2({ rankings, labelToModel, aggregateRankings, onRe
       </p>
 
       <div className="tabs">
-        {rankings.map((rank, index) => (
-          <button
-            key={index}
-            className={`tab ${activeTab === index ? 'active' : ''}`}
-            onClick={() => setActiveTab(index)}
-          >
-            {rank.model.split('/')[1] || rank.model}
-          </button>
-        ))}
+        {rankings.map((rank, index) => {
+          const rankCost = costs?.per_model_costs?.[rank.model];
+          return (
+            <button
+              key={index}
+              className={`tab ${activeTab === index ? 'active' : ''}`}
+              onClick={() => setActiveTab(index)}
+            >
+              {rank.model.split('/')[1] || rank.model}
+              {rankCost && (
+                <span className="tab-cost">{formatCost(rankCost.cost)}</span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
       <div className="tab-content">

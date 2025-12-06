@@ -1,5 +1,31 @@
 # Changelog
 
+## 2025-12-06
+- **Cost Tracking & Estimation**: Comprehensive cost calculation and display
+  - Real-time cost calculation for each turn (Stage 1, 2, 3 costs)
+  - Per-model cost breakdown in Stage 1 and Stage 2
+  - Conversation-level total cost and token usage displayed in header
+  - Turn-level cost summary after each assistant message
+  - Cost calculation based on OpenRouter pricing and actual token usage
+  - API endpoint: `GET /api/conversations/{id}/costs` returns total cost and tokens
+- **Progress Bar**: Meaningful progress tracking during council process
+  - Visual progress bar showing overall completion percentage
+  - Stage-by-stage breakdown: Stage 1 (X/Y models), Stage 2 (X/Y rankings), Stage 3 (synthesizing/complete)
+  - Real-time updates as models complete in Stage 1
+  - Progress events sent from backend as each model finishes
+- **Settings Tab**: Centralized settings interface
+  - New "Settings" tab in main content area (alongside Chat and Leaderboard)
+  - Tabbed interface: Mode Selection, Ranking Rules, Chairman Instructions
+  - All settings consolidated: mode selection, model configuration, persona management, history policy
+  - Council Mode preview showing selected models and pricing
+  - Regular Chat Mode for direct LLM interaction (bypasses council stages)
+  - Custom ranking and chairman prompt templates
+  - Apply button to save all settings to conversation
+- **Bug Fixes**:
+  - Fixed React Hooks order violation in ChatInterface (moved hooks before early return)
+  - Fixed cost calculation endpoint to use message metadata instead of deprecated analyses field
+  - Fixed asyncio import conflict in streaming endpoint
+
 ## 2025-01-XX
 - **Leaderboard Feature**: Cumulative performance tracking for models and personas
   - Automatic tracking of model+persona combinations across all conversations

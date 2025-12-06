@@ -79,6 +79,78 @@
   font-family: monospace;
 }
 
+.model-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.model-cost-info {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.cost-badge,
+.token-badge {
+  padding: 4px 8px;
+  background: var(--panel-alt);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 11px;
+  color: var(--text);
+  font-family: monospace;
+}
+
+.cost-badge {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.stage-cost-summary {
+  padding: 8px 12px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.cost-label {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.cost-value {
+  color: var(--primary);
+  font-weight: 600;
+  font-family: monospace;
+}
+
+.cost-tokens {
+  color: var(--muted);
+  font-size: 12px;
+  font-family: monospace;
+}
+
+.tab-cost {
+  margin-left: 6px;
+  font-size: 11px;
+  color: var(--muted);
+  font-family: monospace;
+}
+
+.tab.active .tab-cost {
+  color: var(--primary);
+}
+
 .response-text {
   color: var(--text);
   line-height: 1.6;

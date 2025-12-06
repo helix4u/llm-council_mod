@@ -4,6 +4,9 @@ import Stage1 from './Stage1';
 import Stage2 from './Stage2';
 import Stage3 from './Stage3';
 import Leaderboard from './Leaderboard';
+import Settings from './Settings';
+import ProgressBar from './ProgressBar';
+import { formatCost, formatTokens } from '../utils/costUtils';
 import { api } from '../api';
 import './ChatInterface.css';
 
@@ -13,9 +16,18 @@ export default function ChatInterface({
   isLoading,
   onMessageDeleted,
   onConversationUpdate,
+  config,
+  councilModels,
+  chairmanModel,
+  historyPolicy,
+  onSettingsChange,
+  onPersonaCompareChange,
+  onModeChange,
+  onNewConversation,
+  onReloadConversation,
 }) {
   const [input, setInput] = useState('');
-  const [viewMode, setViewMode] = useState('chat'); // 'chat' or 'leaderboard'
+  const [viewMode, setViewMode] = useState('chat'); // 'chat', 'leaderboard', or 'settings'
   const [localConversation, setLocalConversation] = useState(conversation);
   const messagesEndRef = useRef(null);
 
@@ -39,6 +51,45 @@ export default function ChatInterface({
       scrollToBottom();
     }
   }, [displayConversation]);
+
+  // Calculate total conversation cost
+  const [totalConversationCost, setTotalConversationCost] = useState(null);
+  const [conversationTokens, setConversationTokens] = useState(null);
+
+  useEffect(() => {
+    if (displayConversation?.id) {
+      const calculateTotal = async () => {
+        try {
+          const costData = await api.getConversationCosts(displayConversation.id);
+          setTotalConversationCost(costData.total_cost);
+          setConversationTokens(costData.total_tokens);
+        } catch (error) {
+          console.error('Failed to load conversation costs:', error);
+          // Calculate from messages if API fails
+          let total = 0;
+          let tokens = { prompt: 0, completion: 0, total: 0 };
+          if (displayConversation.messages) {
+            displayConversation.messages.forEach((msg) => {
+              if (msg.role === 'assistant' && msg.metadata?.costs) {
+                total += msg.metadata.costs.turn_cost || 0;
+                if (msg.metadata.costs.turn_tokens) {
+                  tokens.prompt += msg.metadata.costs.turn_tokens.prompt || 0;
+                  tokens.completion += msg.metadata.costs.turn_tokens.completion || 0;
+                  tokens.total += msg.metadata.costs.turn_tokens.total || 0;
+                }
+              }
+            });
+          }
+          setTotalConversationCost(total);
+          setConversationTokens(tokens);
+        }
+      };
+      calculateTotal();
+    } else {
+      setTotalConversationCost(null);
+      setConversationTokens(null);
+    }
+  }, [displayConversation?.id, displayConversation?.messages]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -194,10 +245,61 @@ export default function ChatInterface({
             >
               Leaderboard
             </button>
+            <button
+              className={`view-tab ${viewMode === 'settings' ? 'active' : ''}`}
+              onClick={() => setViewMode('settings')}
+            >
+              Settings
+            </button>
           </div>
         </div>
         <div className="leaderboard-container">
           <Leaderboard />
+        </div>
+      </div>
+    );
+  }
+
+  // Show settings view
+  if (viewMode === 'settings') {
+    return (
+      <div className="chat-interface">
+        <div className="view-header">
+          <div className="view-tabs">
+            <button
+              className={`view-tab ${viewMode === 'chat' ? 'active' : ''}`}
+              onClick={() => setViewMode('chat')}
+            >
+              Chat
+            </button>
+            <button
+              className={`view-tab ${viewMode === 'leaderboard' ? 'active' : ''}`}
+              onClick={() => setViewMode('leaderboard')}
+            >
+              Leaderboard
+            </button>
+            <button
+              className={`view-tab ${viewMode === 'settings' ? 'active' : ''}`}
+              onClick={() => setViewMode('settings')}
+            >
+              Settings
+            </button>
+          </div>
+        </div>
+        <div className="settings-container">
+          <Settings
+            currentConversationId={conversation?.id}
+            currentConversation={conversation}
+            onNewConversation={onNewConversation}
+            onReloadConversation={onReloadConversation}
+            config={config}
+            councilModels={councilModels}
+            chairmanModel={chairmanModel}
+            historyPolicy={historyPolicy}
+            onSettingsChange={onSettingsChange}
+            onPersonaCompareChange={onPersonaCompareChange}
+            onModeChange={onModeChange}
+          />
         </div>
       </div>
     );
@@ -219,7 +321,26 @@ export default function ChatInterface({
           >
             Leaderboard
           </button>
+          <button
+            className={`view-tab ${viewMode === 'settings' ? 'active' : ''}`}
+            onClick={() => setViewMode('settings')}
+          >
+            Settings
+          </button>
         </div>
+        {displayConversation && (
+          <div className="conversation-cost-header">
+            <span className="conversation-cost-label">Total:</span>
+            <span className="conversation-cost-value">
+              {totalConversationCost !== null ? formatCost(totalConversationCost) : 'Calculating...'}
+            </span>
+            {conversationTokens && conversationTokens.total > 0 && (
+              <span className="conversation-cost-tokens">
+                ({formatTokens(conversationTokens.total)} tokens)
+              </span>
+            )}
+          </div>
+        )}
       </div>
       <div className="messages-container">
         {!displayConversation || !displayConversation.messages || displayConversation.messages.length === 0 ? (
@@ -296,6 +417,14 @@ export default function ChatInterface({
                     </div>
                   )}
 
+                  {/* Progress Bar */}
+                  {(msg.loading?.stage1 || msg.loading?.stage2 || msg.loading?.stage3) && (
+                    <ProgressBar 
+                      progress={msg.progress} 
+                      isLoading={msg.loading?.stage1 || msg.loading?.stage2 || msg.loading?.stage3}
+                    />
+                  )}
+
                   {/* Stage 1 */}
                   {msg.loading?.stage1 && (
                     <div className="stage-loading">
@@ -308,6 +437,7 @@ export default function ChatInterface({
                       responses={msg.stage1}
                       onRedo={() => handleRetryStage(index, 1)}
                       onCopy={(text) => handleCopyText(text)}
+                      costs={msg.metadata?.costs?.stage1}
                     />
                   )}
 
@@ -325,6 +455,7 @@ export default function ChatInterface({
                       aggregateRankings={msg.metadata?.aggregate_rankings}
                       onRedo={() => handleRetryStage(index, 2)}
                       onCopy={(text) => handleCopyText(text)}
+                      costs={msg.metadata?.costs?.stage2}
                     />
                   )}
 
@@ -340,7 +471,23 @@ export default function ChatInterface({
                       finalResponse={msg.stage3}
                       onRedo={() => handleRetryStage(index, 3)}
                       onCopy={(text) => handleCopyText(text)}
+                      costs={msg.metadata?.costs?.stage3}
                     />
+                  )}
+
+                  {/* Turn Cost Summary */}
+                  {msg.metadata?.costs?.turn_cost !== undefined && (
+                    <div className="turn-cost-summary">
+                      <div className="turn-cost-header">
+                        <span className="turn-cost-label">Turn Cost:</span>
+                        <span className="turn-cost-value">{formatCost(msg.metadata.costs.turn_cost)}</span>
+                      </div>
+                      {msg.metadata.costs.turn_tokens && (
+                        <div className="turn-cost-tokens">
+                          {formatTokens(msg.metadata.costs.turn_tokens.prompt)} prompt + {formatTokens(msg.metadata.costs.turn_tokens.completion)} completion = {formatTokens(msg.metadata.costs.turn_tokens.total)} total tokens
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
               )}

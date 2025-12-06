@@ -100,7 +100,8 @@ async def stage2_collect_rankings(
     user_query: str,
     stage1_results: List[Dict[str, Any]],
     system_prompt: Optional[str] = None,
-    models: Optional[List[str]] = None
+    models: Optional[List[str]] = None,
+    ranking_prompt_template: Optional[str] = None
 ) -> Tuple[List[Dict[str, Any]], Dict[str, str]]:
     """
     Stage 2: Each model ranks the anonymized responses.
@@ -128,7 +129,8 @@ async def stage2_collect_rankings(
         for label, result in zip(labels, stage1_results)
     ])
 
-    ranking_prompt = f"""You are evaluating different responses to the following question:
+    # Use custom template if provided, otherwise use default
+    default_ranking_prompt = """You are evaluating different responses to the following question:
 
 Question: {user_query}
 
@@ -158,6 +160,9 @@ FINAL RANKING:
 3. Response B
 
 Now provide your evaluation and ranking:"""
+
+    template = ranking_prompt_template or default_ranking_prompt
+    ranking_prompt = template.replace("{user_query}", user_query).replace("{responses_text}", responses_text)
 
     messages = []
     
@@ -233,7 +238,8 @@ async def stage3_synthesize_final(
     system_prompt: Optional[str] = None,
     chairman_model: Optional[str] = None,
     history_summary: str = "",
-    persona_map: Optional[Dict[str, str]] = None
+    persona_map: Optional[Dict[str, str]] = None,
+    chairman_prompt_template: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     Stage 3: Chairman synthesizes the final answer.
@@ -262,7 +268,8 @@ async def stage3_synthesize_final(
 
     context_note = f"\n\nConversation summary for context:\n{history_summary}" if history_summary else ""
 
-    chairman_prompt = f"""You are the Chairman of the LLM Council.
+    # Use custom template if provided, otherwise use default
+    default_chairman_prompt = """You are the Chairman of the LLM Council.
 
 User Question:
 {user_query}
@@ -280,6 +287,9 @@ Your task as Chairman is to synthesize all of this information into a single, co
 - Any patterns of agreement or disagreement
 
 Provide a clear, well-reasoned final answer that represents the council's collective wisdom:"""
+
+    template = chairman_prompt_template or default_chairman_prompt
+    chairman_prompt = template.replace("{user_query}", user_query).replace("{stage1_text}", stage1_text).replace("{stage2_text}", stage2_text).replace("{context_note}", context_note)
 
     messages = []
 
@@ -465,7 +475,9 @@ async def run_full_council(
     council_models: Optional[List[str]] = None,
     chairman_model: Optional[str] = None,
     history_summary: str = "",
-    persona_map: Optional[Dict[str, str]] = None
+    persona_map: Optional[Dict[str, str]] = None,
+    ranking_prompt_template: Optional[str] = None,
+    chairman_prompt_template: Optional[str] = None
 ) -> Tuple[List, List, Dict, Dict]:
     """
     Run the complete 3-stage council process.
@@ -500,7 +512,8 @@ async def run_full_council(
         user_query,
         stage1_results,
         system_prompt=system_prompt,
-        models=actual_models_from_stage1 if actual_models_from_stage1 else council_models
+        models=actual_models_from_stage1 if actual_models_from_stage1 else council_models,
+        ranking_prompt_template=ranking_prompt_template
     )
 
     # Calculate aggregate rankings
@@ -514,7 +527,8 @@ async def run_full_council(
         system_prompt=system_prompt,
         chairman_model=chairman_model,
         history_summary=history_summary,
-        persona_map=persona_map
+        persona_map=persona_map,
+        chairman_prompt_template=chairman_prompt_template
     )
 
     # Prepare metadata

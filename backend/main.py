@@ -72,6 +72,9 @@ class UpdateConversationSettings(BaseModel):
     council_models: List[str] | None = None
     chairman_model: str | None = None
     persona_map: Dict[str, str] | None = None
+    mode: str | None = None  # 'council', 'persona-compare', 'regular-chat'
+    ranking_prompt: str | None = None
+    chairman_prompt: str | None = None
 
 
 class RetryStageRequest(BaseModel):
@@ -156,6 +159,9 @@ async def update_conversation_settings(conversation_id: str, request: UpdateConv
             system_prompt=request.system_prompt,
             models=models_update if models_update else None,
             persona_map=request.persona_map,
+            mode=request.mode,
+            ranking_prompt=request.ranking_prompt,
+            chairman_prompt=request.chairman_prompt,
         )
         return conversation
     except ValueError:
@@ -302,6 +308,73 @@ async def send_message(conversation_id: str, request: SendMessageRequest):
 
     # Get persona_map from conversation or request
     persona_map = conversation.get("persona_map") or request.persona_map
+    
+    # Get mode and custom prompts
+    mode = conversation.get("mode", "council")
+    ranking_prompt = conversation.get("ranking_prompt")
+    chairman_prompt = conversation.get("chairman_prompt")
+
+    # Handle regular chat mode (direct LLM interaction, no council stages)
+    if mode == "regular-chat":
+        from .openrouter import query_model
+        # Use chairman model or first council model as the chat model
+        chat_model = chairman_model or (council_models[0] if council_models else CHAIRMAN_MODEL)
+        
+        # Build messages for direct chat
+        chat_messages = []
+        if system_prompt:
+            chat_messages.append({"role": "system", "content": system_prompt})
+        chat_messages.extend(history_messages)
+        
+        # Query the model directly
+        response = await query_model(chat_model, chat_messages)
+        
+        if response is None:
+            raise HTTPException(status_code=500, detail="Failed to get response from model")
+        
+        # Store as a simple assistant message (no stages)
+        assistant_content = response.get('content', '')
+        stage3_result = {"model": chat_model, "response": assistant_content}
+        if 'usage' in response:
+            stage3_result['usage'] = response['usage']
+        
+        # Calculate costs for regular chat mode
+        from .cost_calculator import calculate_stage3_costs
+        try:
+            models_data = await list_models()
+            model_pricing = {}
+            for model in models_data:
+                model_pricing[model['id']] = model.get('pricing', {})
+        except Exception:
+            model_pricing = {}
+        
+        stage3_costs = calculate_stage3_costs(stage3_result, model_pricing)
+        turn_cost = stage3_costs['cost']
+        turn_tokens = stage3_costs['tokens']
+        
+        costs_metadata = {
+            'turn_cost': turn_cost,
+            'turn_tokens': turn_tokens,
+            'stage1': {'total_cost': 0.0, 'per_model_costs': {}, 'total_tokens': {'prompt': 0, 'completion': 0, 'total': 0}},
+            'stage2': {'total_cost': 0.0, 'per_model_costs': {}, 'total_tokens': {'prompt': 0, 'completion': 0, 'total': 0}},
+            'stage3': stage3_costs,
+        }
+        
+        # Note: user message was already added above
+        storage.add_assistant_message(
+            conversation_id,
+            [],  # No stage1
+            [],  # No stage2
+            stage3_result,  # Stage3 as final response
+            metadata={'costs': costs_metadata}
+        )
+        
+        return {
+            "stage1": [],
+            "stage2": [],
+            "stage3": stage3_result,
+            "metadata": {'costs': costs_metadata}
+        }
 
     # Run the 3-stage council process
     stage1_results, stage2_results, stage3_result, metadata = await run_full_council(
@@ -311,10 +384,42 @@ async def send_message(conversation_id: str, request: SendMessageRequest):
         council_models=council_models,
         chairman_model=chairman_model,
         history_summary=conversation.get("summary", ""),
-        persona_map=persona_map
+        persona_map=persona_map,
+        ranking_prompt_template=ranking_prompt,
+        chairman_prompt_template=chairman_prompt
     )
     
     # Note: Stage 2 in run_full_council already uses models from stage1_results
+
+    # Calculate costs for this turn
+    from .cost_calculator import calculate_stage1_costs, calculate_stage2_costs, calculate_stage3_costs
+    try:
+        models_data = await list_models()
+        model_pricing = {}
+        for model in models_data:
+            model_pricing[model['id']] = model.get('pricing', {})
+    except Exception:
+        model_pricing = {}
+    
+    stage1_costs = calculate_stage1_costs(stage1_results, model_pricing)
+    stage2_costs = calculate_stage2_costs(stage2_results, model_pricing)
+    stage3_costs = calculate_stage3_costs(stage3_result, model_pricing)
+    
+    turn_cost = stage1_costs['total_cost'] + stage2_costs['total_cost'] + stage3_costs['cost']
+    turn_tokens = {
+        'prompt': stage1_costs['total_tokens']['prompt'] + stage2_costs['total_tokens']['prompt'] + stage3_costs['tokens']['prompt'],
+        'completion': stage1_costs['total_tokens']['completion'] + stage2_costs['total_tokens']['completion'] + stage3_costs['tokens']['completion'],
+        'total': stage1_costs['total_tokens']['total'] + stage2_costs['total_tokens']['total'] + stage3_costs['tokens']['total']
+    }
+    
+    # Add cost information to metadata
+    metadata['costs'] = {
+        'turn_cost': turn_cost,
+        'turn_tokens': turn_tokens,
+        'stage1': stage1_costs,
+        'stage2': stage2_costs,
+        'stage3': stage3_costs,
+    }
 
     # Add assistant message with all stages (analysis stored separately)
     storage.add_assistant_message(
@@ -388,15 +493,149 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
 
             # Get persona_map from conversation or request
             persona_map = conversation_compacted.get("persona_map") or request.persona_map
+            
+            # Get mode and custom prompts
+            mode = conversation_compacted.get("mode", "council")
+            ranking_prompt = conversation_compacted.get("ranking_prompt")
+            chairman_prompt = conversation_compacted.get("chairman_prompt")
 
-            # Stage 1: Collect responses
+            # Handle regular chat mode (direct LLM interaction, no council stages)
+            if mode == "regular-chat":
+                from .openrouter import query_model
+                # Use chairman model or first council model as the chat model
+                chat_model = chairman_model or (council_models[0] if council_models else CHAIRMAN_MODEL)
+                
+                # Build messages for direct chat
+                chat_messages = []
+                if system_prompt:
+                    chat_messages.append({"role": "system", "content": system_prompt})
+                chat_messages.extend(history_messages)
+                
+                # Query the model directly
+                yield f"data: {json.dumps({'type': 'stage3_start'})}\n\n"
+                response = await query_model(chat_model, chat_messages)
+                
+                if response is None:
+                    raise Exception("Failed to get response from model")
+                
+                assistant_content = response.get('content', '')
+                stage3_result = {"model": chat_model, "response": assistant_content}
+                if 'usage' in response:
+                    stage3_result['usage'] = response['usage']
+                
+                # Calculate costs for regular chat mode
+                from .cost_calculator import calculate_stage3_costs
+                try:
+                    models_data = await list_models()
+                    model_pricing = {}
+                    for model in models_data:
+                        model_pricing[model['id']] = model.get('pricing', {})
+                except Exception:
+                    model_pricing = {}
+                
+                stage3_costs = calculate_stage3_costs(stage3_result, model_pricing)
+                turn_cost = stage3_costs['cost']
+                turn_tokens = stage3_costs['tokens']
+                
+                costs_metadata = {
+                    'turn_cost': turn_cost,
+                    'turn_tokens': turn_tokens,
+                    'stage1': {'total_cost': 0.0, 'per_model_costs': {}, 'total_tokens': {'prompt': 0, 'completion': 0, 'total': 0}},
+                    'stage2': {'total_cost': 0.0, 'per_model_costs': {}, 'total_tokens': {'prompt': 0, 'completion': 0, 'total': 0}},
+                    'stage3': stage3_costs,
+                }
+                
+                yield f"data: {json.dumps({'type': 'stage3_complete', 'data': stage3_result})}\n\n"
+                yield f"data: {json.dumps({'type': 'costs', 'data': costs_metadata})}\n\n"
+                
+                # Save the message
+                storage.add_assistant_message(
+                    conversation_id,
+                    [],
+                    [],
+                    stage3_result,
+                    metadata={'costs': costs_metadata}
+                )
+                
+                # Wait for title generation if it was started
+                if title_task:
+                    try:
+                        title = await title_task
+                        storage.update_conversation_title(conversation_id, title)
+                        yield f"data: {json.dumps({'type': 'title_complete', 'data': {'title': title}})}\n\n"
+                    except Exception as title_error:
+                        print(f"Error generating title: {title_error}")
+                
+                yield f"data: {json.dumps({'type': 'complete'})}\n\n"
+                return
+
+            # Stage 1: Collect responses with progress tracking
             yield f"data: {json.dumps({'type': 'stage1_start'})}\n\n"
-            stage1_results = await stage1_collect_responses(
-                history_messages,
-                system_prompt=system_prompt,
-                models=council_models,
-                persona_map=persona_map
-            )
+            
+            # Track progress as models complete
+            from .openrouter import query_model
+            
+            # Build messages
+            prepared_messages = []
+            if system_prompt:
+                prepared_messages.append({"role": "system", "content": system_prompt})
+            prepared_messages.extend(history_messages)
+            
+            # Apply persona_map if provided
+            persona_prompts = {}
+            if persona_map:
+                for model in council_models:
+                    if model in persona_map:
+                        persona_prompts[model] = persona_map[model]
+                    else:
+                        model_name = model.split('/')[-1].split(':')[0]
+                        for persona_key, persona_prompt in persona_map.items():
+                            persona_key_name = persona_key.split('/')[-1].split(':')[0]
+                            if persona_key_name == model_name:
+                                persona_prompts[model] = persona_prompt
+                                break
+            
+            async def call_model(model: str):
+                model_messages = list(prepared_messages)
+                if model in persona_prompts:
+                    model_messages = [{"role": "system", "content": persona_prompts[model]}] + model_messages
+                return await query_model(model, model_messages)
+            
+            # Run all models and track progress as they complete
+            tasks = {model: asyncio.create_task(call_model(model)) for model in council_models}
+            responses_raw = {}
+            
+            # Process results as they complete
+            for model, task in tasks.items():
+                response = await task
+                responses_raw[model] = response
+                # Send progress event when each model completes
+                yield f"data: {json.dumps({'type': 'stage1_progress', 'data': {'model': model}})}\n\n"
+            
+            # Process results
+            stage1_results = []
+            failed_models = []
+            for model, response in responses_raw.items():
+                if response is None:
+                    failed_models.append({"model": model, "error": "No response received"})
+                elif 'error' in response:
+                    failed_models.append({
+                        "model": model,
+                        "error": response['error'].get('message', 'Unknown error'),
+                        "error_type": response['error'].get('type', 'unknown'),
+                        "status_code": response['error'].get('status_code')
+                    })
+                else:
+                    result = {"model": model, "response": response.get('content', '')}
+                    if 'usage' in response:
+                        result['usage'] = response['usage']
+                    stage1_results.append(result)
+            
+            if failed_models:
+                failed_count = len(failed_models)
+                total_count = len(council_models)
+                print(f"Stage 1: {failed_count}/{total_count} models failed")
+            
             yield f"data: {json.dumps({'type': 'stage1_complete', 'data': stage1_results})}\n\n"
 
             # Stage 2: Collect rankings
@@ -404,7 +643,13 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
             actual_models = [result['model'] for result in stage1_results]
             yield f"data: {json.dumps({'type': 'stage2_start'})}\n\n"
             try:
-                stage2_results, label_to_model = await stage2_collect_rankings(request.content, stage1_results, system_prompt=system_prompt, models=actual_models)
+                stage2_results, label_to_model = await stage2_collect_rankings(
+                    request.content, 
+                    stage1_results, 
+                    system_prompt=system_prompt, 
+                    models=actual_models,
+                    ranking_prompt_template=ranking_prompt
+                )
                 aggregate_rankings = []
                 try:
                     aggregate_rankings = calculate_aggregate_rankings(stage2_results, label_to_model)
@@ -436,7 +681,8 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
                         system_prompt=system_prompt, 
                         chairman_model=chairman_model, 
                         history_summary=conversation_compacted.get("summary", ""),
-                        persona_map=persona_map
+                        persona_map=persona_map,
+                        chairman_prompt_template=chairman_prompt
                     )
                 )
                 
@@ -478,6 +724,38 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
                     print(f"Error generating title: {title_error}")
                     # Continue even if title generation fails
 
+            # Calculate costs for this turn
+            from .cost_calculator import calculate_stage1_costs, calculate_stage2_costs, calculate_stage3_costs
+            try:
+                models_data = await list_models()
+                model_pricing = {}
+                for model in models_data:
+                    model_pricing[model['id']] = model.get('pricing', {})
+            except Exception:
+                model_pricing = {}
+            
+            stage1_costs = calculate_stage1_costs(stage1_results, model_pricing)
+            stage2_costs = calculate_stage2_costs(stage2_results, model_pricing)
+            stage3_costs = calculate_stage3_costs(stage3_result, model_pricing)
+            
+            turn_cost = stage1_costs['total_cost'] + stage2_costs['total_cost'] + stage3_costs['cost']
+            turn_tokens = {
+                'prompt': stage1_costs['total_tokens']['prompt'] + stage2_costs['total_tokens']['prompt'] + stage3_costs['tokens']['prompt'],
+                'completion': stage1_costs['total_tokens']['completion'] + stage2_costs['total_tokens']['completion'] + stage3_costs['tokens']['completion'],
+                'total': stage1_costs['total_tokens']['total'] + stage2_costs['total_tokens']['total'] + stage3_costs['tokens']['total']
+            }
+            
+            costs_metadata = {
+                'turn_cost': turn_cost,
+                'turn_tokens': turn_tokens,
+                'stage1': stage1_costs,
+                'stage2': stage2_costs,
+                'stage3': stage3_costs,
+            }
+            
+            # Send costs event
+            yield f"data: {json.dumps({'type': 'costs', 'data': costs_metadata})}\n\n"
+
             # Save complete assistant message (even if some stages failed)
             try:
                 storage.add_assistant_message(
@@ -485,7 +763,11 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
                     stage1_results,
                     stage2_results,
                     stage3_result,
-                    metadata={"label_to_model": label_to_model, "aggregate_rankings": aggregate_rankings}
+                    metadata={
+                        "label_to_model": label_to_model, 
+                        "aggregate_rankings": aggregate_rankings,
+                        "costs": costs_metadata
+                    }
                 )
             except Exception as save_error:
                 print(f"Error saving assistant message: {save_error}")
@@ -698,22 +980,24 @@ async def get_conversation_costs(conversation_id: str):
     if conversation is None:
         raise HTTPException(status_code=404, detail="Conversation not found")
     
-    # Get model pricing from API
-    try:
-        models_data = await list_models()
-        model_pricing = {}
-        for model in models_data:
-            model_pricing[model['id']] = model.get('pricing', {})
-    except Exception:
-        # If we can't get pricing, return empty costs
-        model_pricing = {}
+    # Calculate from messages' metadata (where costs are actually stored)
+    total_cost = 0.0
+    total_tokens = {'prompt': 0, 'completion': 0, 'total': 0}
     
-    # Calculate costs
-    from .cost_calculator import calculate_total_conversation_cost
-    analyses = conversation.get('analyses', [])
-    cost_data = calculate_total_conversation_cost(analyses, model_pricing)
+    messages = conversation.get('messages', [])
+    for msg in messages:
+        if msg.get('role') == 'assistant' and msg.get('metadata', {}).get('costs'):
+            costs = msg['metadata']['costs']
+            total_cost += costs.get('turn_cost', 0.0)
+            turn_tokens = costs.get('turn_tokens', {})
+            total_tokens['prompt'] += turn_tokens.get('prompt', 0)
+            total_tokens['completion'] += turn_tokens.get('completion', 0)
+            total_tokens['total'] += turn_tokens.get('total', 0)
     
-    return cost_data
+    return {
+        'total_cost': total_cost,
+        'total_tokens': total_tokens
+    }
 
 
 if __name__ == "__main__":

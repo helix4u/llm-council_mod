@@ -120,6 +120,47 @@
   color: var(--primary);
   border-color: var(--primary);
   border-bottom-color: var(--panel);
+}
+
+.stage2 .tab-cost {
+  margin-left: 6px;
+  font-size: 11px;
+  color: var(--muted);
+  font-family: monospace;
+}
+
+.stage2 .tab.active .tab-cost {
+  color: var(--primary);
+}
+
+.stage2 .stage-cost-summary {
+  padding: 8px 12px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.stage2 .cost-label {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.stage2 .cost-value {
+  color: var(--primary);
+  font-weight: 600;
+  font-family: monospace;
+}
+
+.stage2 .cost-tokens {
+  color: var(--muted);
+  font-size: 12px;
+  font-family: monospace;
+}
   font-weight: 600;
 }
 

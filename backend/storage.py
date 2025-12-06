@@ -60,6 +60,9 @@ def create_conversation(conversation_id: str, system_prompt: Optional[str] = Non
             "chairman": CHAIRMAN_MODEL,
         },
         "persona_map": {},
+        "mode": "council",  # Default mode
+        "ranking_prompt": None,  # Will use default from council.py
+        "chairman_prompt": None,  # Will use default from council.py
     }
 
     # Save to file
@@ -400,6 +403,9 @@ def update_conversation_settings(
     system_prompt: Optional[str] = None,
     models: Optional[Dict[str, Any]] = None,
     persona_map: Optional[Dict[str, str]] = None,
+    mode: Optional[str] = None,
+    ranking_prompt: Optional[str] = None,
+    chairman_prompt: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Update per-conversation settings like history policy, system prompt, or models."""
     conversation = get_conversation(conversation_id)
@@ -414,6 +420,12 @@ def update_conversation_settings(
         conversation["models"] = {**conversation.get("models", {}), **models}
     if persona_map is not None:
         conversation["persona_map"] = persona_map
+    if mode is not None:
+        conversation["mode"] = mode
+    if ranking_prompt is not None:
+        conversation["ranking_prompt"] = ranking_prompt
+    if chairman_prompt is not None:
+        conversation["chairman_prompt"] = chairman_prompt
 
     save_conversation(conversation)
     return conversation
